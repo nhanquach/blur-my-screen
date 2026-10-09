@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blur My Page</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="logo" aria-hidden="true">◐</div>
+        <div><h1>Blur My Page</h1><p>Privacy, right when you need it.</p></div>
+      </header>
+
+      <section class="panel">
+        <label class="toggle-row" for="enabled"><span><strong>Privacy screen</strong><small>Blur pages after inactivity</small></span><input id="enabled" type="checkbox" role="switch"></label>
+        <label for="idle-minutes">Idle timeout</label>
+        <select id="idle-minutes">
+          <option value="1">1 minute</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option>
+        </select>
+      </section>
+
+      <section class="panel">
+        <span class="label">Reveal with</span>
+        <div class="segmented" role="radiogroup" aria-label="Unlock method">
+          <label><input type="radio" name="unlock-mode" value="click"> Click</label>
+          <label><input type="radio" name="unlock-mode" value="password"> Password</label>
+        </div>
+        <div id="password-row" hidden>
+          <label for="password">Set password</label>
+          <input id="password" type="password" autocomplete="new-password" placeholder="Enter a password">
+          <p class="hint">Leave empty to keep your current password.</p>
+        </div>
+      </section>
+
+      <button id="lock-now" class="lock-button" type="button">Blur this tab now</button>
+      <p id="status" class="status" role="status"></p>
+    </main>
+    <script src="../shared/settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

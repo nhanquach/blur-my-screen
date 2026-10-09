@@ -1,0 +1,10 @@
+{
+  "name": "blur-my-page",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Chrome privacy screen that blurs idle webpages.",
+  "scripts": {
+    "check": "node --check src/content/content.js && node --check src/popup/popup.js && node --check src/shared/settings.js && node scripts/validate-manifest.js",
+    "build": "npm run check"
+  }
+}

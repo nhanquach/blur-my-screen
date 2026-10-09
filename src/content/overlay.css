@@ -1,0 +1,5 @@
+/* The overlay is rendered in a closed shadow root for page-style isolation.
+   This rule resets the shadow host itself before its internal styles take over. */
+#__blur_my_page_overlay__ {
+  all: initial;
+}

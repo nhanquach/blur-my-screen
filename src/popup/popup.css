@@ -75,7 +75,15 @@ header p {
 }
 
 .master-toggle input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.master-toggle:focus-within .status-label {
+  outline: 2px solid var(--matcha-primary);
+  outline-offset: 3px;
 }
 
 .status-label {
@@ -164,7 +172,15 @@ header p {
 }
 
 .preset-pills input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.preset-pills label:focus-within {
+  outline: 2px solid var(--matcha-primary);
+  outline-offset: 2px;
 }
 
 .preset-pills label:has(input:checked) {
@@ -211,7 +227,7 @@ header p {
 /* Segmented Control */
 .segmented {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   background-color: var(--container-low);
   border-radius: var(--radius-small);
   padding: 2px;
@@ -228,7 +244,16 @@ header p {
 }
 
 .segmented input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.segmented label:focus-within {
+  outline: 2px solid var(--matcha-primary);
+  outline-offset: 2px;
+  z-index: 1;
 }
 
 .segmented label:has(input:checked) {
@@ -261,6 +286,16 @@ input[type="range"] {
   width: 100%;
   accent-color: var(--matcha-primary);
   cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--matcha-primary);
+  outline-offset: 2px;
+}
+
+.switch:focus-within .slider {
+  outline: 2px solid var(--matcha-primary);
+  outline-offset: 2px;
 }
 
 /* Preview Area */
@@ -347,9 +382,10 @@ input[type="range"] {
 }
 
 .switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   opacity: 0;
-  width: 0;
-  height: 0;
 }
 
 .slider {

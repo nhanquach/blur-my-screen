@@ -49,6 +49,7 @@
         <span class="label">Cloak Appearance</span>
         <div class="segmented" role="radiogroup" aria-label="Appearance mode">
           <label><input type="radio" name="mode" value="frosted"> <span>Frosted</span></label>
+          <label><input type="radio" name="mode" value="dimmed"> <span>Dimmed</span></label>
           <label><input type="radio" name="mode" value="minimal"> <span>Minimal</span></label>
         </div>
         
@@ -57,7 +58,7 @@
             <span id="intensity-label" class="label">Blur Intensity</span>
             <span id="intensity-value" class="value">20px</span>
           </div>
-          <input id="intensity" type="range" min="4" max="40" step="1">
+          <input id="intensity" type="range" min="4" max="40" step="1" aria-label="Blur intensity">
         </div>
         <div class="slider-container" id="brightness-control">
           <div class="slider-header">
@@ -85,19 +86,19 @@
         <span class="label">Smart Triggers</span>
         <div class="trigger-row">
           <span>Pause when media playing</span>
-          <label class="switch"><input id="pause-media" type="checkbox"><span class="slider"></span></label>
+          <label class="switch"><input id="pause-media" type="checkbox" aria-label="Pause when media playing"><span class="slider"></span></label>
         </div>
         <div class="trigger-row">
           <span>Blur on focus loss</span>
-          <label class="switch"><input id="cloak-focus" type="checkbox"><span class="slider"></span></label>
+          <label class="switch"><input id="cloak-focus" type="checkbox" aria-label="Blur on focus loss"><span class="slider"></span></label>
         </div>
         <div class="trigger-row">
           <span>Targeted PII masking</span>
-          <label class="switch"><input id="mask-pii" type="checkbox"><span class="slider"></span></label>
+          <label class="switch"><input id="mask-pii" type="checkbox" aria-label="Targeted PII masking"><span class="slider"></span></label>
         </div>
         <div class="trigger-row">
           <span>Hide HUD Capsule</span>
-          <label class="switch"><input id="hide-hud" type="checkbox"><span class="slider"></span></label>
+          <label class="switch"><input id="hide-hud" type="checkbox" aria-label="Hide HUD Capsule"><span class="slider"></span></label>
         </div>
       </section>
 

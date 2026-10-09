@@ -22,9 +22,7 @@
       // Allow a custom timeout from 5 seconds to one hour; the popup still
       // offers common presets for quick selection.
       idleTimeoutSeconds: Math.min(3600, Math.max(5, Math.round(Number(settings.idleTimeoutSeconds) || DEFAULT_SETTINGS.idleTimeoutSeconds))),
-      // Dimmed is retained as a migration path for existing installations;
-      // brightness is now adjustable within the Frosted cloak.
-      cloakMode: settings.cloakMode === 'minimal' ? 'minimal' : 'frosted',
+      cloakMode: ['frosted', 'dimmed', 'minimal'].includes(settings.cloakMode) ? settings.cloakMode : 'frosted',
       blurIntensityPx: Math.min(40, Math.max(4, Number(settings.blurIntensityPx) || DEFAULT_SETTINGS.blurIntensityPx)),
       brightnessPercent: Math.min(100, Math.max(40, Number(settings.brightnessPercent) || DEFAULT_SETTINGS.brightnessPercent)),
       pauseWhenMediaPlaying: settings.pauseWhenMediaPlaying !== false,

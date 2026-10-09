@@ -13,6 +13,7 @@
   let enabled = false;
   let observer;
   let mutationTimer;
+  const pendingNodes = new Set();
   let initialized = false;
 
   function isLuhnValid(value) {
@@ -31,6 +32,21 @@
 
   function setRevealed(mask, revealed) {
     mask.classList.toggle('blur-my-screen-pii-revealed', revealed);
+    if (revealed) {
+      mask.style.setProperty('color', 'inherit', 'important');
+      mask.style.setProperty('background', 'transparent', 'important');
+      mask.style.setProperty('backdrop-filter', 'none', 'important');
+      mask.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
+    } else {
+      mask.style.removeProperty('color');
+      mask.style.removeProperty('background');
+      mask.style.removeProperty('backdrop-filter');
+      mask.style.removeProperty('-webkit-backdrop-filter');
+      mask.style.color = 'transparent';
+      mask.style.background = 'rgba(245,243,240,.65)';
+      mask.style.backdropFilter = 'blur(6px)';
+      mask.style.webkitBackdropFilter = 'blur(6px)';
+    }
   }
 
   function createMask(text) {
@@ -85,21 +101,40 @@
     }));
   }
 
-  function scanPage() {
-    if (!enabled || !document.body) return countMasks();
-    observer?.disconnect();
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  function scanSubtree(root) {
+    if (!root) return;
+    if (root.nodeType === Node.TEXT_NODE) { scanNode(root); return; }
+    if (root.nodeType !== Node.ELEMENT_NODE && root.nodeType !== Node.DOCUMENT_FRAGMENT_NODE) return;
+    if (root.nodeType === Node.ELEMENT_NODE && root.matches(SKIP_SELECTOR)) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(scanNode);
+  }
+
+  function scanPage() {
+    if (!enabled || !document.body) return countMasks();
+    observer?.disconnect();
+    scanSubtree(document.body);
     observe();
     emitUpdate();
     return countMasks();
   }
 
-  function onMutations() {
+  function onMutations(records) {
+    if (!enabled) return;
+    records.forEach((record) => {
+      if (record.type === 'characterData') pendingNodes.add(record.target);
+      record.addedNodes?.forEach((node) => pendingNodes.add(node));
+    });
+    if (!pendingNodes.size) return;
     window.clearTimeout(mutationTimer);
-    mutationTimer = window.setTimeout(scanPage, 300);
+    mutationTimer = window.setTimeout(() => {
+      const affected = [...pendingNodes];
+      pendingNodes.clear();
+      affected.forEach(scanSubtree);
+      emitUpdate();
+    }, 100);
   }
 
   function observe() {
@@ -116,6 +151,7 @@
       enabled = false;
       window.clearTimeout(mutationTimer);
       observer?.disconnect();
+      pendingNodes.clear();
       unwrapMasks();
       emitUpdate();
       return;

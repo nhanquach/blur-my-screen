@@ -22,6 +22,8 @@
 
   const MESSAGES = window.BlurMyScreenMessages;
   let countdownInterval;
+  let sliderSaveTimer;
+  let saveQueue = Promise.resolve();
 
   function updateCountdown() {
     clearInterval(countdownInterval);
@@ -67,7 +69,7 @@
     customTimeout.value = preset ? '' : String(timeoutSeconds);
   }
 
-  async function saveSettings() {
+  function saveSettings() {
     const modeValue = document.querySelector('input[name="mode"]:checked')?.value;
     const timeoutSeconds = selectedTimeoutSeconds();
     
@@ -83,12 +85,27 @@
       hideHUD: hideHud.checked,
     };
 
-    await window.BlurMyScreenSettings.save(updates);
-    updateMasterLabel();
+    saveQueue = saveQueue.catch(() => undefined).then(() => window.BlurMyScreenSettings.save(updates));
+    return saveQueue.then(updateMasterLabel);
   }
 
   function updateMasterLabel() {
     statusLabelText.textContent = enabled.checked ? 'Protecting' : 'Off';
+  }
+
+  function scheduleSliderSave() {
+    window.clearTimeout(sliderSaveTimer);
+    sliderSaveTimer = window.setTimeout(() => {
+      sliderSaveTimer = undefined;
+      saveSettings();
+    }, 200);
+  }
+
+  function flushSliderSave() {
+    if (sliderSaveTimer === undefined) return;
+    window.clearTimeout(sliderSaveTimer);
+    sliderSaveTimer = undefined;
+    saveSettings();
   }
 
   function updatePreview() {
@@ -108,6 +125,12 @@
       const veilOpacity = Math.min(.84, .12 + (1 - brightnessPercent / 100) * 1.2);
       backdropStyle = `blur(${val}px) saturate(0.8) brightness(${brightnessPercent / 100})`;
       bgColor = `rgba(35, 52, 42, ${veilOpacity})`;
+    } else if (mode === 'dimmed') {
+      labelText = 'Veil Opacity';
+      valueText = 'Dark veil';
+      backdropStyle = 'none';
+      bgColor = 'rgba(15, 25, 20, .74)';
+      borderColor = 'rgba(15, 25, 20, .85)';
     } else if (mode === 'minimal') {
       labelText = 'Ceramic Tone';
       const hue = 80 + (val / 40) * 60; // 80 to 140 (greens/beiges)
@@ -120,7 +143,7 @@
     intensityLabel.textContent = labelText;
     intensityValue.textContent = valueText;
     brightnessValue.textContent = `${brightnessPercent}%`;
-    brightnessControl.hidden = mode === 'minimal';
+    brightnessControl.hidden = mode !== 'frosted';
 
     previewCard.style.backdropFilter = backdropStyle;
     previewCard.style.webkitBackdropFilter = backdropStyle;
@@ -192,12 +215,14 @@
   }));
   intensity.addEventListener('input', () => {
     updatePreview();
-    saveSettings();
+    scheduleSliderSave();
   });
+  intensity.addEventListener('change', flushSliderSave);
   brightness.addEventListener('input', () => {
     updatePreview();
-    saveSettings();
+    scheduleSliderSave();
   });
+  brightness.addEventListener('change', flushSliderSave);
   pauseMedia.addEventListener('change', saveSettings);
   cloakFocus.addEventListener('change', saveSettings);
   maskPii.addEventListener('change', saveSettings);

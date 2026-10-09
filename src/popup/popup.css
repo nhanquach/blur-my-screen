@@ -374,6 +374,13 @@ input[type="range"] {
   color: var(--text-main);
 }
 
+.site-pii-help {
+  margin: -5px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .switch {
   position: relative;
   display: inline-block;

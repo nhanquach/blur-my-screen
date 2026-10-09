@@ -9,7 +9,7 @@
   let inactivityTimer;
   let locked = false;
   let host;
-  let deadline = 0;
+  const inactivity = window.BlurMyScreenInactivityTimer.create();
   let marquee;
   let marqueeMode = false;
   let pendingManualLock = false;
@@ -19,26 +19,36 @@
   }
 
   function remainingSeconds() {
-    if (!settings?.enabled || locked || mediaPlaying() && settings.pauseWhenMediaPlaying) return null;
-    return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    if (!settings?.enabled || locked || inactivity.isPaused()) return null;
+    return Math.ceil(inactivity.remaining() / 1000);
   }
 
   function clearTimer() { window.clearTimeout(inactivityTimer); }
 
   function scheduleLock(reset = true) {
     clearTimer();
-    if (!settings?.enabled || locked) return;
-    if (settings.pauseWhenMediaPlaying && mediaPlaying()) return;
-    if (reset || !deadline) deadline = Date.now() + settings.idleTimeoutSeconds * 1000;
-    inactivityTimer = window.setTimeout(() => lock('idle'), Math.max(0, deadline - Date.now()));
+    if (!settings?.enabled) { inactivity.clear(); return; }
+    if (locked) return;
+
+    if (reset) inactivity.reset(settings.idleTimeoutSeconds * 1000);
+    if (settings.pauseWhenMediaPlaying && mediaPlaying()) {
+      inactivity.pause();
+      return;
+    }
+    if (inactivity.isPaused()) inactivity.resume();
+    if (!inactivity.hasDeadline()) inactivity.reset(settings.idleTimeoutSeconds * 1000);
+
+    const remainingMs = inactivity.remaining();
+    if (remainingMs <= 0) { lock('idle'); return; }
+    inactivityTimer = window.setTimeout(() => lock('idle'), remainingMs);
   }
 
   function recordActivity() { if (!locked) scheduleLock(true); }
 
   function onMediaChange() {
     if (locked || !settings?.enabled || !settings.pauseWhenMediaPlaying) return;
-    if (mediaPlaying()) clearTimer();
-    else scheduleLock(true);
+    // Playback only pauses the current budget. It must never reset the timer.
+    scheduleLock(false);
   }
 
   function addMediaListeners(root = document) {
@@ -127,11 +137,12 @@
     host.id = OVERLAY_ID;
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.innerHTML = `<style>
-      .screen{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;padding:20px;box-sizing:border-box;color:#263c32;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;opacity:0;transition:opacity 360ms cubic-bezier(.22,.61,.36,1);will-change:opacity}.screen.is-visible{opacity:1}.screen.is-peeking{opacity:0;transition-duration:180ms}.screen:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,#3d5a49 1px,transparent 1px);background-size:40px 40px;opacity:.05}.hud{position:relative;display:flex;align-items:center;width:min(372px,100%);height:46px;padding:0 7px;border:1px solid #e4e9e5;border-radius:15px;background:#fff;box-shadow:0 12px 30px rgba(31,53,42,.16),0 2px 6px rgba(31,53,42,.06);opacity:0;transform:translateY(10px) scale(.985);transition:opacity 260ms ease-out 70ms,transform 360ms cubic-bezier(.22,.61,.36,1) 70ms;will-change:transform,opacity}.screen.is-visible .hud{opacity:1;transform:translateY(0) scale(1)}.screen.is-peeking .hud{transition-delay:0ms}.identity{display:flex;align-items:center;gap:7px;min-width:0;padding:0 7px 0 1px}.shield{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:#e7f4eb;color:#477663}.shield svg,.action svg,.unblur svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.brand{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;letter-spacing:-.01em}.state{display:block;width:5px;height:5px;margin-left:1px;border-radius:50%;background:#4b8069;box-shadow:0 0 0 2px #e6f4ec}.status{display:none}.unblur{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;margin-left:auto;padding:0 9px;border:0;border-radius:8px;background:#3d6654;color:#fff;font:700 12px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.16)}.unblur svg{color:#fff;stroke:#fff!important;flex:0 0 16px}.unblur:hover{background:#315644}.key{padding:2px 4px;border-radius:3px;background:rgba(255,255,255,.17);font:600 9px/1 ui-monospace,SFMono-Regular,monospace;color:#fff}.separator{width:1px;height:22px;margin:0 2px 0 7px;background:#e7ece8}.action{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#486052;cursor:pointer}.action:hover,.action:focus-visible{background:#edf3ef;outline:none}.action:focus-visible,.unblur:focus-visible{outline:2px solid #264d3c;outline-offset:2px}@media(max-width:430px){.screen{padding:12px}.hud{width:100%;height:44px}.identity{padding-right:3px}.brand{font-size:0}.state{margin-left:0}.unblur{gap:5px;padding:0 8px}.key{display:none}.separator{margin:0 1px 0 5px}.action{width:28px;height:28px}}@media(prefers-reduced-motion:reduce){.screen,.hud{transition:none!important}.screen{will-change:auto}.hud{will-change:auto}}</style>
-      <section class="screen" role="dialog" aria-modal="true" aria-labelledby="hud-title" tabindex="-1"><div class="hud"><div class="identity"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5.5 6v5.2c0 4.4 2.7 7.5 6.5 9.3 3.8-1.8 6.5-4.9 6.5-9.3V6L12 3Z"/></svg></span><span class="brand" id="hud-title">BlurMyScreen</span><span class="state" aria-label="Protection active"></span></div><p class="status" id="hud-status"></p><button class="unblur" id="unblur" type="button" aria-label="Unblur screen; hold Space for a temporary peek"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.25"/></svg><span>Unblur</span><kbd class="key">Space</kbd></button><span class="separator" aria-hidden="true"></span><button class="action" id="tune" type="button" aria-label="Cycle cloak appearance"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></button><button class="action" id="lock" type="button" aria-label="Lock screen"><svg viewBox="0 0 24 24"><rect x="5.5" y="10" width="13" height="10" rx="2"/><path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10"/></svg></button></div></section>`;
+      .screen{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;padding:20px;box-sizing:border-box;color:#263c32;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;opacity:0;transition:opacity 360ms cubic-bezier(.22,.61,.36,1);will-change:opacity}.screen.is-visible{opacity:1}.screen.is-peeking{opacity:0;transition-duration:180ms}.screen:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,#3d5a49 1px,transparent 1px);background-size:40px 40px;opacity:.05}.hud{position:relative;display:flex;align-items:center;width:min(372px,100%);height:46px;padding:0 7px;border:1px solid #e4e9e5;border-radius:15px;background:#fff;box-shadow:0 12px 30px rgba(31,53,42,.16),0 2px 6px rgba(31,53,42,.06);opacity:0;transform:translateY(10px) scale(.985);transition:opacity 260ms ease-out 70ms,transform 360ms cubic-bezier(.22,.61,.36,1) 70ms;will-change:transform,opacity}.screen.is-visible .hud{opacity:1;transform:translateY(0) scale(1)}.screen.is-peeking .hud{transition-delay:0ms}.identity{display:flex;align-items:center;gap:7px;min-width:0;padding:0 7px 0 1px}.shield{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:#e7f4eb;color:#477663}.shield svg,.action svg,.unblur svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.brand{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;letter-spacing:-.01em}.state{display:block;width:5px;height:5px;margin-left:1px;border-radius:50%;background:#4b8069;box-shadow:0 0 0 2px #e6f4ec}.status{display:none}.unblur{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;margin-left:auto;padding:0 9px;border:0;border-radius:8px;background:#3d6654;color:#fff;font:700 12px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.16)}.unlock-fallback{position:relative;margin-left:0;padding:0 16px;box-shadow:0 8px 20px rgba(31,53,42,.2)}.unblur svg{color:#fff;stroke:#fff!important;flex:0 0 16px}.unblur:hover{background:#315644}.key{padding:2px 4px;border-radius:3px;background:rgba(255,255,255,.17);font:600 9px/1 ui-monospace,SFMono-Regular,monospace;color:#fff}.separator{width:1px;height:22px;margin:0 2px 0 7px;background:#e7ece8}.action{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#486052;cursor:pointer}.action:hover,.action:focus-visible{background:#edf3ef;outline:none}.action:focus-visible,.unblur:focus-visible{outline:2px solid #264d3c;outline-offset:2px}@media(max-width:430px){.screen{padding:12px}.hud{width:100%;height:44px}.identity{padding-right:3px}.brand{font-size:0}.state{margin-left:0}.unblur{gap:5px;padding:0 8px}.key{display:none}.separator{margin:0 1px 0 5px}.action{width:28px;height:28px}}@media(prefers-reduced-motion:reduce){.screen,.hud{transition:none!important}.screen{will-change:auto}.hud{will-change:auto}}</style>
+      <section class="screen" role="dialog" aria-modal="true" aria-labelledby="hud-title" tabindex="-1"><div class="hud"><div class="identity"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5.5 6v5.2c0 4.4 2.7 7.5 6.5 9.3 3.8-1.8 6.5-4.9 6.5-9.3V6L12 3Z"/></svg></span><span class="brand" id="hud-title">BlurMyScreen</span><span class="state" aria-label="Protection active"></span></div><p class="status" id="hud-status"></p><button class="unblur" id="unblur" type="button" aria-label="Unblur screen; hold Space for a temporary peek"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.25"/></svg><span>Unblur</span><kbd class="key">Space</kbd></button><span class="separator" aria-hidden="true"></span><button class="action" id="tune" type="button" aria-label="Cycle cloak appearance"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></button><button class="action" id="lock" type="button" aria-label="Lock screen"><svg viewBox="0 0 24 24"><rect x="5.5" y="10" width="13" height="10" rx="2"/><path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10"/></svg></button></div><button class="unblur unlock-fallback" id="unblur-fallback" type="button" aria-label="Unblur screen">Unblur screen</button></section>`;
     const screen = shadow.querySelector('.screen');
     applyVeilStyle(screen);
     shadow.querySelector('#unblur').addEventListener('click', unlock);
+    shadow.querySelector('#unblur-fallback').addEventListener('click', unlock);
     shadow.querySelector('#lock').addEventListener('click', () => lock('manual'));
     shadow.querySelector('#tune').addEventListener('click', async () => {
       const modes = ['frosted', 'dimmed', 'minimal'];
@@ -139,12 +150,14 @@
       applyVeilStyle(screen);
     });
     document.documentElement.append(host);
-    if (settings.hideHUD) shadow.querySelector('.hud').hidden = true;
+    const hud = shadow.querySelector('.hud');
+    const fallbackUnlock = shadow.querySelector('#unblur-fallback');
+    hud.hidden = settings.hideHUD;
+    fallbackUnlock.hidden = !settings.hideHUD;
     updateHudStatus();
     requestAnimationFrame(() => {
       screen.classList.add('is-visible');
-      const initialFocus = shadow.querySelector('.hud').hidden ? screen : shadow.querySelector('#unblur');
-      initialFocus.focus({ preventScroll: true });
+      (settings.hideHUD ? fallbackUnlock : shadow.querySelector('#unblur')).focus({ preventScroll: true });
     });
   }
 
@@ -161,6 +174,7 @@
     }
     locked = true;
     clearTimer();
+    inactivity.clear();
     chrome.runtime.sendMessage({ type: MESSAGES.LOCK_STATE, locked: true }).catch(() => undefined);
     renderOverlay();
   }
@@ -202,7 +216,7 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     if (event.key === 'Tab') {
-      const controls = [...(host?.shadowRoot?.querySelectorAll('.hud:not([hidden]) button:not([hidden])') || [])];
+      const controls = [...(host?.shadowRoot?.querySelectorAll('.hud:not([hidden]) button:not([hidden]), .unlock-fallback:not([hidden])') || [])];
       if (!controls.length) { host?.shadowRoot?.querySelector('.screen')?.focus(); return; }
       const first = controls[0]; const last = controls.at(-1);
       const active = host?.shadowRoot?.activeElement;
@@ -262,7 +276,7 @@
   document.addEventListener('focusin', (event) => {
     if (locked && host && event.target !== host && !host.contains(event.target)) {
       const hud = host.shadowRoot?.querySelector('.hud');
-      (hud && !hud.hidden ? hud.querySelector('#unblur') : host.shadowRoot?.querySelector('.screen'))?.focus({ preventScroll: true });
+      (hud && !hud.hidden ? hud.querySelector('#unblur') : host.shadowRoot?.querySelector('#unblur-fallback'))?.focus({ preventScroll: true });
     }
   }, true);
   window.addEventListener('blur', () => { if (locked) onKeyUp({ code: 'Space' }); });

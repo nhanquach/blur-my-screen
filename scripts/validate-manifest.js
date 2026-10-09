@@ -10,8 +10,8 @@ for (const permission of ['storage', 'tabs', 'idle', 'windows']) {
   if (!manifest.permissions?.includes(permission)) throw new Error(`Missing required permission: ${permission}`);
 }
 const scripts = manifest.content_scripts?.[0];
-const expectedScripts = ['src/shared/messages.js', 'src/shared/settings.js', 'src/content/pii-scanner.js', 'src/content/content.js'];
-if (!scripts || JSON.stringify(scripts.js) !== JSON.stringify(expectedScripts)) throw new Error('Content scripts must load shared modules, PII scanner, then controller.');
+const expectedScripts = ['src/shared/messages.js', 'src/shared/settings.js', 'src/shared/inactivity-timer.js', 'src/content/pii-scanner.js', 'src/content/content.js'];
+if (!scripts || JSON.stringify(scripts.js) !== JSON.stringify(expectedScripts)) throw new Error('Content scripts must load shared modules, inactivity timer, PII scanner, then controller.');
 if (JSON.stringify(scripts.matches) !== JSON.stringify(['http://*/*', 'https://*/*'])) throw new Error('Content scripts must be limited to HTTP(S) pages.');
 for (const file of [...expectedScripts, manifest.background.service_worker, 'src/popup/popup.js']) {
   if (!fs.existsSync(file)) throw new Error(`Required file missing: ${file}`);

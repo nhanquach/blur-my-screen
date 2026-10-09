@@ -9,14 +9,14 @@ BlurMyScreen moves away from clinical security software towards a mindful, botan
 
 - **Automated Privacy Shield:** Automatically blurs the page after a configurable idle period (15s to 5m).
 - **Smart Behavioral Triggers:**
-  - **Media Awareness:** Automatically pauses the idle timer when audio or video is playing.
+  - **Media Awareness:** Automatically pauses the remaining idle timer while audio or video plays, then resumes that remaining time when playback stops.
   - **Context Awareness:** Can be configured to blur immediately upon window unfocus or tab switching.
 - **Configurable Cloaking:**
   - **Frosted (Matcha Mist):** Organic diffusion using GPU-accelerated backdrop-filters.
   - **Dimmed:** Neutral low-luminance veil.
   - **Minimal:** Solid, opaque ceramic mask.
-- **Targeted PII Masking:** Heuristic detection of emails, credit card numbers, and currency metrics with a "Shift + Hover" peek affordance.
-- **In-Page HUD:** A lightweight porcelain capsule for quick unblurring, tuning, and status monitoring.
+- **Targeted PII Masking:** Heuristic detection of emails, credit card numbers, and currency metrics with a "Shift + Hover" peek affordance. The popup can exclude the current `http(s)` origin locally without sending page data anywhere.
+- **In-Page HUD:** A lightweight porcelain capsule for quick unblurring, tuning, and status monitoring. Hiding the capsule leaves a persistent, labeled Unblur button on every locked page.
 - **Power-User Hotkeys:**
   - `Esc`: Instant manual lock.
   - `Space` (Hold): Temporary peek reveal.
@@ -40,13 +40,14 @@ BlurMyScreen moves away from clinical security software towards a mindful, botan
 
 - `storage` saves preferences locally; `tabs`, `idle`, and `windows` coordinate the active page with system-idle and focus-loss events. The extension does not read, retain, or transmit page text.
 - PII masking is a conservative visual heuristic for emails, Luhn-valid card-like numbers, common currency values, and explicitly labelled names. It can miss values or mask benign text, so it must not be relied on as a data-loss-prevention control.
-- The HUD and popup controls are keyboard accessible. `Esc` cloaks immediately, holding `Space` temporarily peeks, and `Cmd/Ctrl+M` enables a marquee reveal. Reduced-motion preferences disable overlay transitions.
+- The HUD and popup controls are keyboard accessible. `Esc` cloaks immediately, holding `Space` temporarily peeks, and `Cmd/Ctrl+M` enables a marquee reveal. The popup's `[Peek]` control supports press-and-hold with keyboard, mouse, and touch. Reduced-motion preferences disable overlay transitions.
 - Browser-internal pages such as `chrome://`, extension galleries, and other restricted pages cannot be injected or protected; the popup identifies those pages as unsupported.
 
 ## 🧪 Development
 
 ```sh
 npm run check
+npm test
 ```
 
-The check command validates the Manifest V3 configuration and ensures all required source files are present.
+The check command validates syntax and the Manifest V3 configuration. The test command covers the pure inactivity-timer behavior used to preserve the remaining timeout around media playback.

@@ -4,7 +4,8 @@
   "private": true,
   "description": "An ambient, privacy-first browser extension for effortless confidentiality.",
   "scripts": {
-    "check": "node --check src/background/service-worker.js && node --check src/content/content.js && node --check src/content/pii-scanner.js && node --check src/popup/popup.js && node --check src/shared/messages.js && node --check src/shared/settings.js && node scripts/validate-manifest.js",
+    "check": "node --check src/background/service-worker.js && node --check src/content/content.js && node --check src/content/pii-scanner.js && node --check src/popup/popup.js && node --check src/shared/messages.js && node --check src/shared/settings.js && node --check src/shared/inactivity-timer.js && node scripts/validate-manifest.js",
+    "test": "node --test test/*.test.js",
     "build": "npm run check"
   }
 }

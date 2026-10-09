@@ -13,8 +13,24 @@
     pauseWhenMediaPlaying: true,
     cloakOnFocusLoss: true,
     targetedMaskingEnabled: true,
+    piiDisabledOrigins: [],
     hideHUD: false,
   });
+
+  function normalizeOrigin(value) {
+    try {
+      const url = new URL(value);
+      return ['http:', 'https:'].includes(url.protocol) ? url.origin : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function normalizeOrigins(origins) {
+    return [...new Set((Array.isArray(origins) ? origins : [])
+      .map(normalizeOrigin)
+      .filter(Boolean))].slice(0, 200);
+  }
 
   function normalize(settings = {}) {
     return {
@@ -28,6 +44,7 @@
       pauseWhenMediaPlaying: settings.pauseWhenMediaPlaying !== false,
       cloakOnFocusLoss: settings.cloakOnFocusLoss !== false,
       targetedMaskingEnabled: settings.targetedMaskingEnabled !== false,
+      piiDisabledOrigins: normalizeOrigins(settings.piiDisabledOrigins),
       hideHUD: settings.hideHUD === true,
     };
   }
@@ -60,5 +77,20 @@
     return normalized;
   }
 
-  window.BlurMyScreenSettings = { DEFAULT_SETTINGS, get, save };
+  function isPiiMaskingEnabledForOrigin(settings, origin) {
+    const normalizedOrigin = normalizeOrigin(origin);
+    return Boolean(settings?.targetedMaskingEnabled) && Boolean(normalizedOrigin) && !normalizeOrigins(settings?.piiDisabledOrigins).includes(normalizedOrigin);
+  }
+
+  async function setPiiMaskingForOrigin(origin, enabled) {
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) throw new TypeError('PII masking exceptions require an http(s) origin.');
+    const settings = await get();
+    const disabledOrigins = new Set(settings.piiDisabledOrigins);
+    if (enabled) disabledOrigins.delete(normalizedOrigin);
+    else disabledOrigins.add(normalizedOrigin);
+    return save({ piiDisabledOrigins: [...disabledOrigins] });
+  }
+
+  window.BlurMyScreenSettings = { DEFAULT_SETTINGS, get, save, normalizeOrigin, isPiiMaskingEnabledForOrigin, setPiiMaskingForOrigin };
 })();

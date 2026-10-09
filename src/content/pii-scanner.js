@@ -146,7 +146,7 @@
   }
 
   function applySettings(settings) {
-    const nextEnabled = Boolean(settings?.targetedMaskingEnabled);
+    const nextEnabled = window.BlurMyScreenSettings.isPiiMaskingEnabledForOrigin(settings, window.location.origin);
     if (!nextEnabled) {
       enabled = false;
       window.clearTimeout(mutationTimer);

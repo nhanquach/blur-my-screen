@@ -17,6 +17,9 @@
   const pauseMedia = $('#pause-media');
   const cloakFocus = $('#cloak-focus');
   const maskPii = $('#mask-pii');
+  const sitePii = $('#site-pii');
+  const sitePiiLabel = $('#site-pii-label');
+  const sitePiiHelp = $('#site-pii-help');
   const hideHud = $('#hide-hud');
   const status = $('#status');
 
@@ -24,6 +27,10 @@
   let countdownInterval;
   let sliderSaveTimer;
   let saveQueue = Promise.resolve();
+  let activeOrigin;
+  let currentSettings;
+  let peekPointerId;
+  let peekKeyboardActive = false;
 
   function updateCountdown() {
     clearInterval(countdownInterval);
@@ -86,11 +93,52 @@
     };
 
     saveQueue = saveQueue.catch(() => undefined).then(() => window.BlurMyScreenSettings.save(updates));
-    return saveQueue.then(updateMasterLabel);
+    return saveQueue.then((savedSettings) => {
+      currentSettings = savedSettings;
+      updateMasterLabel();
+      updateSitePiiControl();
+      return savedSettings;
+    });
   }
 
   function updateMasterLabel() {
     statusLabelText.textContent = enabled.checked ? 'Protecting' : 'Off';
+  }
+
+  function updateSitePiiControl() {
+    if (!activeOrigin) {
+      sitePii.disabled = true;
+      sitePii.checked = false;
+      sitePiiLabel.textContent = 'Mask PII on this site';
+      sitePiiHelp.textContent = 'This page does not have a supported web origin.';
+      return;
+    }
+
+    const siteName = new URL(activeOrigin).host;
+    const isExcluded = currentSettings?.piiDisabledOrigins?.includes(activeOrigin);
+    sitePii.disabled = false;
+    sitePii.checked = !isExcluded;
+    sitePiiLabel.textContent = `Mask PII on ${siteName}`;
+    sitePiiHelp.textContent = currentSettings?.targetedMaskingEnabled === false
+      ? 'Targeted PII masking is currently off globally.'
+      : 'This preference is stored locally for this origin only.';
+  }
+
+  async function saveSitePiiPreference() {
+    if (!activeOrigin) return;
+    const shouldMask = sitePii.checked;
+    sitePii.disabled = true;
+    saveQueue = saveQueue.catch(() => undefined).then(() => window.BlurMyScreenSettings.setPiiMaskingForOrigin(activeOrigin, shouldMask));
+    try {
+      currentSettings = await saveQueue;
+      updateSitePiiControl();
+      showStatus(shouldMask ? 'PII masking enabled for this site.' : 'PII masking disabled for this site.');
+    } catch {
+      sitePii.checked = !shouldMask;
+      showStatus('Could not update this site preference.');
+    } finally {
+      updateSitePiiControl();
+    }
   }
 
   function scheduleSliderSave() {
@@ -168,7 +216,12 @@
   }
 
   async function initialize() {
-    const settings = await window.BlurMyScreenSettings.get();
+    const [settings, tabs] = await Promise.all([
+      window.BlurMyScreenSettings.get(),
+      chrome.tabs.query({ active: true, currentWindow: true }),
+    ]);
+    currentSettings = settings;
+    activeOrigin = window.BlurMyScreenSettings.normalizeOrigin(tabs[0]?.url);
 
     enabled.checked = settings.enabled;
     updateMasterLabel();
@@ -184,7 +237,8 @@
     cloakFocus.checked = settings.cloakOnFocusLoss;
     maskPii.checked = settings.targetedMaskingEnabled;
     hideHud.checked = settings.hideHUD;
-    
+    updateSitePiiControl();
+
     updatePreview();
     updateCountdown();
   }
@@ -226,16 +280,50 @@
   pauseMedia.addEventListener('change', saveSettings);
   cloakFocus.addEventListener('change', saveSettings);
   maskPii.addEventListener('change', saveSettings);
+  sitePii.addEventListener('change', saveSitePiiPreference);
   hideHud.addEventListener('change', saveSettings);
   $('#lock-now').addEventListener('click', lockCurrentTab);
 
-  // Preview Peek interaction: hold to reveal
-  previewPeek.addEventListener('mousedown', () => {
+  // Preview Peek interaction: hold to reveal with keyboard, mouse, and touch.
+  function revealPreview() {
     previewCard.style.backdropFilter = 'none';
     previewCard.style.webkitBackdropFilter = 'none';
+  }
+
+  function hidePreview() {
+    peekPointerId = undefined;
+    peekKeyboardActive = false;
+    updatePreview();
+  }
+
+  previewPeek.addEventListener('pointerdown', (event) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    peekPointerId = event.pointerId;
+    previewPeek.setPointerCapture?.(event.pointerId);
+    revealPreview();
+    event.preventDefault();
   });
-  previewPeek.addEventListener('mouseup', updatePreview);
-  previewPeek.addEventListener('mouseleave', updatePreview);
+  previewPeek.addEventListener('pointerup', (event) => {
+    if (event.pointerId === peekPointerId) hidePreview();
+  });
+  previewPeek.addEventListener('pointercancel', hidePreview);
+  previewPeek.addEventListener('lostpointercapture', hidePreview);
+  previewPeek.addEventListener('keydown', (event) => {
+    if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+      peekKeyboardActive = true;
+      revealPreview();
+      event.preventDefault();
+    }
+  });
+  previewPeek.addEventListener('keyup', (event) => {
+    if (peekKeyboardActive && (event.key === ' ' || event.key === 'Enter')) {
+      hidePreview();
+      event.preventDefault();
+    }
+  });
+  previewPeek.addEventListener('blur', hidePreview);
+  window.addEventListener('blur', hidePreview);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hidePreview(); });
 
   initialize();
 })();

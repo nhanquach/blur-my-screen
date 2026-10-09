@@ -36,6 +36,13 @@ BlurMyScreen moves away from clinical security software towards a mindful, botan
 - **No Analytics:** Zero external analytics or telemetry.
 - **Privacy Screen, Not Security:** This is a visual privacy shield to prevent casual shoulder-surfing. It does not encrypt or remove the underlying webpage content.
 
+### Permissions and limitations
+
+- `storage` saves preferences locally; `tabs`, `idle`, and `windows` coordinate the active page with system-idle and focus-loss events. The extension does not read, retain, or transmit page text.
+- PII masking is a conservative visual heuristic for emails, Luhn-valid card-like numbers, common currency values, and explicitly labelled names. It can miss values or mask benign text, so it must not be relied on as a data-loss-prevention control.
+- The HUD and popup controls are keyboard accessible. `Esc` cloaks immediately, holding `Space` temporarily peeks, and `Cmd/Ctrl+M` enables a marquee reveal. Reduced-motion preferences disable overlay transitions.
+- Browser-internal pages such as `chrome://`, extension galleries, and other restricted pages cannot be injected or protected; the popup identifies those pages as unsupported.
+
 ## 🧪 Development
 
 ```sh

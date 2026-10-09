@@ -37,25 +37,43 @@
           <label><input type="radio" name="timeout" value="180"> <span>3m</span></label>
           <label><input type="radio" name="timeout" value="300"> <span>5m</span></label>
         </div>
+        <label class="custom-timeout" for="custom-timeout">
+          <span>Custom</span>
+          <input id="custom-timeout" type="number" min="5" max="3600" step="5" inputmode="numeric" placeholder="Seconds" aria-describedby="custom-timeout-help">
+          <span>sec</span>
+          <span id="custom-timeout-help" class="sr-only">Set a custom inactivity timeout from 5 seconds to 1 hour.</span>
+        </label>
       </section>
 
       <section class="panel">
         <span class="label">Cloak Appearance</span>
         <div class="segmented" role="radiogroup" aria-label="Appearance mode">
           <label><input type="radio" name="mode" value="frosted"> <span>Frosted</span></label>
-          <label><input type="radio" name="mode" value="dimmed"> <span>Dimmed</span></label>
           <label><input type="radio" name="mode" value="minimal"> <span>Minimal</span></label>
         </div>
         
         <div class="slider-container">
           <div class="slider-header">
-            <span class="label">Blur Intensity</span>
+            <span id="intensity-label" class="label">Blur Intensity</span>
             <span id="intensity-value" class="value">20px</span>
           </div>
           <input id="intensity" type="range" min="4" max="40" step="1">
         </div>
+        <div class="slider-container" id="brightness-control">
+          <div class="slider-header">
+            <span class="label">Brightness</span>
+            <span id="brightness-value" class="value">70%</span>
+          </div>
+          <input id="brightness" type="range" min="40" max="100" step="1" aria-label="Cloak brightness">
+        </div>
 
         <div class="preview-area">
+          <div class="preview-dummy-content">
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+            <div></div><div></div><div></div><div></div>
+          </div>
           <div id="preview-card" class="preview-card">
             <span class="preview-text">Confidential</span>
             <button id="preview-peek" class="peek-btn">[Peek]</button>
@@ -77,11 +95,16 @@
           <span>Targeted PII masking</span>
           <label class="switch"><input id="mask-pii" type="checkbox"><span class="slider"></span></label>
         </div>
+        <div class="trigger-row">
+          <span>Hide HUD Capsule</span>
+          <label class="switch"><input id="hide-hud" type="checkbox"><span class="slider"></span></label>
+        </div>
       </section>
 
       <button id="lock-now" class="primary-btn" type="button">Lock Screen Now</button>
       <p id="status" class="status-msg" role="status"></p>
     </main>
+    <script src="../shared/messages.js"></script>
     <script src="../shared/settings.js"></script>
     <script src="popup.js"></script>
   </body>

@@ -9,24 +9,28 @@
     idleTimeoutSeconds: 180,
     cloakMode: 'frosted',
     blurIntensityPx: 20,
+    brightnessPercent: 70,
     pauseWhenMediaPlaying: true,
     cloakOnFocusLoss: true,
     targetedMaskingEnabled: true,
+    hideHUD: false,
   });
 
   function normalize(settings = {}) {
     return {
       enabled: settings.enabled !== false,
-      idleTimeoutSeconds: [15, 30, 60, 180, 300].includes(Number(settings.idleTimeoutSeconds))
-        ? Number(settings.idleTimeoutSeconds)
-        : DEFAULT_SETTINGS.idleTimeoutSeconds,
-      cloakMode: ['frosted', 'dimmed', 'minimal'].includes(settings.cloakMode)
-        ? settings.cloakMode
-        : DEFAULT_SETTINGS.cloakMode,
+      // Allow a custom timeout from 5 seconds to one hour; the popup still
+      // offers common presets for quick selection.
+      idleTimeoutSeconds: Math.min(3600, Math.max(5, Math.round(Number(settings.idleTimeoutSeconds) || DEFAULT_SETTINGS.idleTimeoutSeconds))),
+      // Dimmed is retained as a migration path for existing installations;
+      // brightness is now adjustable within the Frosted cloak.
+      cloakMode: settings.cloakMode === 'minimal' ? 'minimal' : 'frosted',
       blurIntensityPx: Math.min(40, Math.max(4, Number(settings.blurIntensityPx) || DEFAULT_SETTINGS.blurIntensityPx)),
+      brightnessPercent: Math.min(100, Math.max(40, Number(settings.brightnessPercent) || DEFAULT_SETTINGS.brightnessPercent)),
       pauseWhenMediaPlaying: settings.pauseWhenMediaPlaying !== false,
       cloakOnFocusLoss: settings.cloakOnFocusLoss !== false,
       targetedMaskingEnabled: settings.targetedMaskingEnabled !== false,
+      hideHUD: settings.hideHUD === true,
     };
   }
 

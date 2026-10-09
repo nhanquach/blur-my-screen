@@ -26,7 +26,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/shared/settings.js", "src/content/pii-scanner.js", "src/content/content.js"],
+      "js": ["src/shared/messages.js", "src/shared/settings.js", "src/content/pii-scanner.js", "src/content/content.js"],
       "css": ["src/content/overlay.css"],
       "run_at": "document_start"
     }

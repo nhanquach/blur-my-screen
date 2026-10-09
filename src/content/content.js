@@ -3,344 +3,214 @@
 
   const IDLE_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'touchmove'];
   const OVERLAY_ID = '__blur_my_screen_overlay__';
-
-  let settings = {
-    enabled: true,
-    idleTimeoutSeconds: 180,
-    cloakMode: 'frosted',
-    blurIntensityPx: 20,
-    pauseWhenMediaPlaying: true,
-    cloakOnFocusLoss: true,
-    targetedMaskingEnabled: true,
-  };
-  
+  const OVERLAY_TRANSITION_MS = 360;
+  const MESSAGES = window.BlurMyScreenMessages;
+  let settings;
   let inactivityTimer;
   let locked = false;
   let host;
-  let startTime = Date.now();
+  let deadline = 0;
+  let marquee;
+  let marqueeMode = false;
 
-  function getRemainingSeconds() {
-    if (!settings.enabled || locked) return null;
-    const elapsed = Date.now() - startTime;
-    const remaining = (settings.idleTimeoutSeconds * 1000) - elapsed;
-    return Math.max(0, Math.floor(remaining / 1000));
+  function mediaPlaying() {
+    return [...document.querySelectorAll('video, audio')].some((media) => !media.paused && !media.ended);
   }
 
-  function isMediaPlaying() {
-    return !!document.querySelector('video:not([paused]), audio:not([paused])');
+  function remainingSeconds() {
+    if (!settings?.enabled || locked || mediaPlaying() && settings.pauseWhenMediaPlaying) return null;
+    return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
   }
 
-  function clearTimer() {
-    window.clearTimeout(inactivityTimer);
-  }
+  function clearTimer() { window.clearTimeout(inactivityTimer); }
 
-  function scheduleLock() {
+  function scheduleLock(reset = true) {
     clearTimer();
-    if (!settings.enabled || locked) return;
-
-    if (settings.pauseWhenMediaPlaying && isMediaPlaying()) {
-      inactivityTimer = window.setTimeout(scheduleLock, 5000);
-      return;
-    }
-
-    startTime = Date.now();
-    inactivityTimer = window.setTimeout(() => lock('idle'), settings.idleTimeoutSeconds * 1000);
+    if (!settings?.enabled || locked) return;
+    if (settings.pauseWhenMediaPlaying && mediaPlaying()) return;
+    if (reset || !deadline) deadline = Date.now() + settings.idleTimeoutSeconds * 1000;
+    inactivityTimer = window.setTimeout(() => lock('idle'), Math.max(0, deadline - Date.now()));
   }
 
-  function recordActivity() {
-    if (!locked) {
-      scheduleLock();
-    }
+  function recordActivity() { if (!locked) scheduleLock(true); }
+
+  function onMediaChange() {
+    if (locked || !settings?.enabled || !settings.pauseWhenMediaPlaying) return;
+    if (mediaPlaying()) clearTimer();
+    else scheduleLock(true);
   }
 
-  function handleKeyDown(event) {
-    if (event.key === 'Escape') {
-      lock('manual-esc');
-    }
-
-    if (event.code === 'Space' && locked) {
-      event.preventDefault();
-      peekReveal(true);
-    }
-
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'm') {
-      event.preventDefault();
-      toggleMarqueeMode();
-    }
+  function addMediaListeners(root = document) {
+    root.querySelectorAll?.('video, audio').forEach((media) => {
+      if (media.dataset.blurMyScreenObserved) return;
+      media.dataset.blurMyScreenObserved = 'true';
+      media.addEventListener('play', onMediaChange);
+      media.addEventListener('pause', onMediaChange);
+      media.addEventListener('ended', onMediaChange);
+    });
   }
 
-  function handleKeyUp(event) {
-    if (event.code === 'Space') {
-      peekReveal(false);
-    }
-  }
-
-  function peekReveal(show) {
-    if (!host) return;
-    const screen = host.shadowRoot?.querySelector('.screen');
-    if (screen) {
-      screen.style.opacity = show ? '0' : '1';
-      screen.style.pointerEvents = show ? 'none' : 'auto';
-    }
-  }
-
-  let marqueeOverlay = null;
-  let isMarqueeMode = false;
-
-  function toggleMarqueeMode() {
-    if (isMarqueeMode) {
-      disableMarquee();
+  function applyVeilStyle(screen) {
+    const intensity = settings.blurIntensityPx;
+    if (settings.cloakMode === 'frosted') {
+      const brightness = settings.brightnessPercent / 100;
+      // The veil itself must darken too; an opaque light veil would otherwise
+      // wash out the page even when the backdrop brightness is lowered.
+      const veilOpacity = Math.min(.84, .12 + (1 - brightness) * 1.2);
+      screen.style.backdropFilter = `blur(${intensity}px) saturate(.8) brightness(${brightness})`;
+      screen.style.webkitBackdropFilter = screen.style.backdropFilter;
+      screen.style.background = `rgba(35,52,42,${veilOpacity})`;
     } else {
-      enableMarquee();
+      screen.style.backdropFilter = 'none';
+      screen.style.webkitBackdropFilter = 'none';
+      screen.style.background = '#F4F5F0';
     }
   }
 
-  function enableMarquee() {
-    if (!locked) return;
-    isMarqueeMode = true;
-    
-    marqueeOverlay = document.createElement('div');
-    marqueeOverlay.id = '__blur_my_screen_marquee__';
-    marqueeOverlay.style.cssText = `
-      position: fixed; inset: 0; z-index: 2147483646; 
-      cursor: crosshair; pointer-events: auto;
-    `;
-    
-    marqueeOverlay.innerHTML = `
-      <div class="m-pane top"></div>
-      <div class="m-pane right"></div>
-      <div class="m-pane bottom"></div>
-      <div class="m-pane left"></div>
-      <style>
-        .m-pane { position: absolute; background: transparent; pointer-events: none; }
-        .m-pane.top { top: 0; left: 0; right: 0; }
-        .m-pane.right { top: 0; right: 0; bottom: 0; }
-        .m-pane.bottom { bottom: 0; left: 0; right: 0; }
-        .m-pane.left { top: 0; left: 0; bottom: 0; }
-      </style>
-    `;
-    
-    document.documentElement.append(marqueeOverlay);
-
-    marqueeOverlay.addEventListener('mousedown', startMarquee);
-    window.addEventListener('keydown', handleMarqueeKeys);
-  }
-
-  function startMarquee(event) {
-    const startX = event.clientX;
-    const startY = event.clientY;
-    
-    const onMouseMove = (e) => {
-      const x = Math.min(startX, e.clientX);
-      const y = Math.min(startY, e.clientY);
-      const w = Math.abs(startX - e.clientX);
-      const h = Math.abs(startY - e.clientY);
-      
-      const panes = marqueeOverlay.querySelectorAll('.m-pane');
-      panes[0].style.height = `${y}px`; // top
-      panes[1].style.width = `${window.innerWidth - (x + w)}px`; // right
-      panes[2].style.top = `${y + h}px`; // bottom
-      panes[3].style.width = `${x}px`; // left
-      
-      const screen = host?.shadowRoot?.querySelector('.screen');
-      if (screen) {
-        screen.style.clipPath = `polygon(0% 0%, 0% 100%, ${x}px 100%, ${x}px ${y + h}px, ${x + w}px ${y + h}px, ${x + w}px ${y}px, ${x}px ${y}px, ${x}px 100%, 0% 100%)`;
-      }
-    };
-
-    const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  }
-
-  function handleMarqueeKeys(event) {
-    if (event.key === 'Escape') disableMarquee();
+  function updateHudStatus() {
+    const status = host?.shadowRoot?.querySelector('#hud-status');
+    if (!status) return;
+    const pii = window.BlurMyScreenPII?.getStatus();
+    status.textContent = pii?.count ? `Protected · ${pii.count} PII fields masked` : 'Protected locally';
   }
 
   function disableMarquee() {
-    isMarqueeMode = false;
-    marqueeOverlay?.remove();
-    marqueeOverlay = null;
-    window.removeEventListener('keydown', handleMarqueeKeys);
-    
+    marqueeMode = false;
+    marquee?.remove();
+    marquee = undefined;
     const screen = host?.shadowRoot?.querySelector('.screen');
-    if (screen) {
-      screen.style.clipPath = '';
-    }
+    if (screen) screen.style.visibility = '';
   }
 
-  function removeOverlay() {
-    disableMarquee();
+  function enableMarquee() {
+    if (!locked || marqueeMode) return;
+    marqueeMode = true;
+    const screen = host?.shadowRoot?.querySelector('.screen');
+    if (screen) screen.style.visibility = 'hidden';
+    marquee = document.createElement('div');
+    marquee.id = '__blur_my_screen_marquee__';
+    marquee.innerHTML = '<i></i><i></i><i></i><i></i>';
+    marquee.style.cssText = 'position:fixed;inset:0;z-index:2147483647;cursor:crosshair';
+    marquee.querySelectorAll('i').forEach((pane) => Object.assign(pane.style, { position: 'fixed', display: 'block', background: 'rgba(244,245,240,.7)', backdropFilter: `blur(${settings.blurIntensityPx}px)`, WebkitBackdropFilter: `blur(${settings.blurIntensityPx}px)` }));
+    document.documentElement.append(marquee);
+    marquee.addEventListener('pointerdown', (event) => {
+      const start = { x: event.clientX, y: event.clientY };
+      const update = (move) => {
+        const x = Math.min(start.x, move.clientX); const y = Math.min(start.y, move.clientY);
+        const width = Math.abs(start.x - move.clientX); const height = Math.abs(start.y - move.clientY);
+        const [top, right, bottom, left] = marquee.querySelectorAll('i');
+        Object.assign(top.style, { left: '0', top: '0', width: '100vw', height: `${y}px` });
+        Object.assign(right.style, { left: `${x + width}px`, top: `${y}px`, right: '0', bottom: '0' });
+        Object.assign(bottom.style, { left: `${x}px`, top: `${y + height}px`, right: '0', bottom: '0' });
+        Object.assign(left.style, { left: '0', top: `${y}px`, width: `${x}px`, bottom: '0' });
+      };
+      const finish = () => { window.removeEventListener('pointermove', update); window.removeEventListener('pointerup', finish); };
+      window.addEventListener('pointermove', update); window.addEventListener('pointerup', finish, { once: true });
+      update(event);
+    });
+  }
+
+  function renderOverlay() {
     host?.remove();
-    host = undefined;
+    host = document.createElement('div');
+    host.id = OVERLAY_ID;
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = `<style>
+      .screen{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;padding:20px;box-sizing:border-box;color:#263c32;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;opacity:0;transition:opacity 360ms cubic-bezier(.22,.61,.36,1);will-change:opacity}.screen.is-visible{opacity:1}.screen.is-peeking{opacity:0;transition-duration:180ms}.screen:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,#3d5a49 1px,transparent 1px);background-size:40px 40px;opacity:.05}.hud{position:relative;display:flex;align-items:center;width:min(372px,100%);height:46px;padding:0 7px;border:1px solid #e4e9e5;border-radius:15px;background:#fff;box-shadow:0 12px 30px rgba(31,53,42,.16),0 2px 6px rgba(31,53,42,.06);opacity:0;transform:translateY(10px) scale(.985);transition:opacity 260ms ease-out 70ms,transform 360ms cubic-bezier(.22,.61,.36,1) 70ms;will-change:transform,opacity}.screen.is-visible .hud{opacity:1;transform:translateY(0) scale(1)}.screen.is-peeking .hud{transition-delay:0ms}.identity{display:flex;align-items:center;gap:7px;min-width:0;padding:0 7px 0 1px}.shield{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:#e7f4eb;color:#477663}.shield svg,.action svg,.unblur svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.brand{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;letter-spacing:-.01em}.state{display:block;width:5px;height:5px;margin-left:1px;border-radius:50%;background:#4b8069;box-shadow:0 0 0 2px #e6f4ec}.status{display:none}.unblur{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;margin-left:auto;padding:0 9px;border:0;border-radius:8px;background:#3d6654;color:#fff;font:700 12px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.16)}.unblur svg{color:#fff;stroke:#fff!important;flex:0 0 16px}.unblur:hover{background:#315644}.key{padding:2px 4px;border-radius:3px;background:rgba(255,255,255,.17);font:600 9px/1 ui-monospace,SFMono-Regular,monospace;color:#fff}.separator{width:1px;height:22px;margin:0 2px 0 7px;background:#e7ece8}.action{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#486052;cursor:pointer}.action:hover,.action:focus-visible{background:#edf3ef;outline:none}.action:focus-visible,.unblur:focus-visible{outline:2px solid #264d3c;outline-offset:2px}@media(max-width:430px){.screen{padding:12px}.hud{width:100%;height:44px}.identity{padding-right:3px}.brand{font-size:0}.state{margin-left:0}.unblur{gap:5px;padding:0 8px}.key{display:none}.separator{margin:0 1px 0 5px}.action{width:28px;height:28px}}@media(prefers-reduced-motion:reduce){.screen,.hud{transition:none!important}.screen{will-change:auto}.hud{will-change:auto}}</style>
+      <section class="screen" role="dialog" aria-modal="true" aria-labelledby="hud-title"><div class="hud"><div class="identity"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5.5 6v5.2c0 4.4 2.7 7.5 6.5 9.3 3.8-1.8 6.5-4.9 6.5-9.3V6L12 3Z"/></svg></span><span class="brand" id="hud-title">BlurMyScreen</span><span class="state" aria-label="Protection active"></span></div><p class="status" id="hud-status"></p><button class="unblur" id="unblur" type="button" aria-label="Unblur screen; hold Space for a temporary peek"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.25"/></svg><span>Unblur</span><kbd class="key">Space</kbd></button><span class="separator" aria-hidden="true"></span><button class="action" id="tune" type="button" aria-label="Cycle cloak appearance"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></button><button class="action" id="lock" type="button" aria-label="Lock screen"><svg viewBox="0 0 24 24"><rect x="5.5" y="10" width="13" height="10" rx="2"/><path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10"/></svg></button></div></section>`;
+    const screen = shadow.querySelector('.screen');
+    applyVeilStyle(screen);
+    shadow.querySelector('#unblur').addEventListener('click', unlock);
+    shadow.querySelector('#lock').addEventListener('click', () => lock('manual'));
+    shadow.querySelector('#tune').addEventListener('click', async () => {
+      const modes = ['frosted', 'minimal'];
+      settings = await window.BlurMyScreenSettings.save({ cloakMode: modes[(modes.indexOf(settings.cloakMode) + 1) % modes.length] });
+      applyVeilStyle(screen);
+    });
+    document.documentElement.append(host);
+    if (settings.hideHUD) shadow.querySelector('.hud').hidden = true;
+    updateHudStatus();
+    requestAnimationFrame(() => {
+      screen.classList.add('is-visible');
+    });
+  }
+
+  function lock(reason) {
+    const manual = reason.startsWith('manual');
+    if (!settings.enabled && !manual) return;
+    if (locked) {
+      disableMarquee();
+      // A manual lock request should still provide clear feedback, even when a
+      // focus-loss cloak is already covering the tab.
+      if (manual) renderOverlay();
+      return;
+    }
+    locked = true;
+    clearTimer();
+    renderOverlay();
   }
 
   function unlock() {
     locked = false;
-    removeOverlay();
-    scheduleLock();
+    disableMarquee();
+    const currentHost = host;
+    const screen = currentHost?.shadowRoot?.querySelector('.screen');
+    if (screen) {
+      screen.classList.remove('is-visible');
+      screen.classList.remove('is-peeking');
+      setTimeout(() => {
+        if (host === currentHost) {
+          host?.remove();
+          host = undefined;
+        }
+      }, OVERLAY_TRANSITION_MS);
+    } else {
+      host?.remove();
+      host = undefined;
+    }
+    scheduleLock(true);
   }
 
-  function renderOverlay() {
-    removeOverlay();
-    host = document.createElement('div');
-    host.id = OVERLAY_ID;
-    host.setAttribute('aria-live', 'polite');
-    const shadow = host.attachShadow({ mode: 'closed' });
-
-    const backdropStyle = settings.cloakMode === 'frosted' 
-      ? `blur(${settings.blurIntensityPx}px) saturate(0.8) brightness(0.9)`
-      : settings.cloakMode === 'dimmed'
-      ? `brightness(0.4) contrast(0.8)`
-      : `blur(0px) brightness(1)`;
-
-    const bgStyle = settings.cloakMode === 'minimal'
-      ? '#fbf9f6' 
-      : 'rgba(251, 249, 246, 0.6)';
-
-    const style = `
-      :host { all: initial; }
-      .screen { 
-        position: fixed; inset: 0; z-index: 2147483647; 
-        display: grid; place-items: center; box-sizing: border-box; 
-        padding: 24px; color: #3d5a49; font-family: 'Manrope', sans-serif; 
-        background: ${bgStyle}; 
-        backdrop-filter: ${backdropStyle}; 
-        -webkit-backdrop-filter: ${backdropStyle}; 
-        transition: opacity 240ms ease;
-      }
-      .screen::before { 
-        content: ""; position: absolute; inset: 0; pointer-events: none; 
-        background-image: radial-gradient(circle, #3d5a49 1px, transparent 1px);
-        background-size: 40px 40px;
-        opacity: 0.05;
-      }
-      .hud { 
-        position: relative; width: min(100%, 320px); padding: 24px; 
-        text-align: center; border: 1px solid rgba(61, 90, 73, 0.2); 
-        border-radius: 16px; background: rgba(255, 255, 255, 0.8); 
-        box-shadow: 0 12px 40px rgba(0,0,0,0.1);
-        backdrop-filter: blur(10px);
-      }
-      .brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
-      .logo { font-size: 24px; }
-      h1 { margin: 0; font-size: 20px; font-weight: 700; color: #3d5a49; }
-      .status-pill { 
-        display: inline-flex; align-items: center; justify-content: center; gap: 4px; 
-        padding: 4px 12px; background: #f5f3f0; border-radius: 20px; 
-        font-size: 12px; font-weight: 600; color: #6b7c74; margin-bottom: 20px;
-      }
-      button { 
-        width: 100%; min-height: 44px; border: 0; border-radius: 12px; 
-        cursor: pointer; background: #3d5a49; color: white; 
-        font-weight: 700; transition: transform 150ms ease;
-      }
-      button:active { transform: scale(0.95); }
-      .secondary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-      .secondary-actions button { background: #f5f3f0; color: #3d5a49; font-size: 12px; }
-      @media (prefers-reduced-motion: reduce) { .screen, button { transition: none; } }
-    `;
-
-    shadow.innerHTML = `
-      <style>${style}</style>
-      <section class="screen" role="dialog" aria-modal="true" aria-labelledby="hud-title">
-        <div class="hud">
-          <div class="brand">
-            <span class="logo">🌿</span>
-            <h1 id="hud-title">BlurMyScreen</h1>
-          </div>
-          <div class="status-pill" id="hud-status">
-            <span class="dot"></span> Protecting your privacy
-          </div>
-          <button id="unblur-btn">Unblur Screen</button>
-          <div class="secondary-actions">
-            <button id="tune-btn">Tune</button>
-            <button id="lock-btn">Hard Lock</button>
-          </div>
-        </div>
-      </section>
-    `;
-
-    const unblurBtn = shadow.querySelector('#unblur-btn');
-    if (unblurBtn) unblurBtn.addEventListener('click', unlock);
-
-    document.documentElement.append(host);
+  function onKeyDown(event) {
+    if (event.key === 'Escape') { disableMarquee(); lock('manual-esc'); return; }
+    if (event.code === 'Space' && locked && !event.repeat) { event.preventDefault(); host?.shadowRoot?.querySelector('.screen')?.classList.add('is-peeking'); }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'm') { event.preventDefault(); marqueeMode ? disableMarquee() : enableMarquee(); }
   }
 
-  function lock(reason) {
-    if (!settings.enabled || locked) return;
-    locked = true;
-    clearTimer();
-    renderOverlay();
-    console.log(`Cloaked due to: ${reason}`);
+  function onKeyUp(event) { if (event.code === 'Space') host?.shadowRoot?.querySelector('.screen')?.classList.remove('is-peeking'); }
+
+  function applySettings(next) {
+    settings = next;
+    window.BlurMyScreenPII?.applySettings(settings);
+    addMediaListeners();
+    if (!settings.enabled && locked) unlock();
+    else if (locked) renderOverlay();
+    else scheduleLock(true);
   }
+
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === MESSAGES.LOCK) { lock('manual'); sendResponse({ locked }); }
+    else if (message?.type === MESSAGES.AUTO_LOCK) { lock('system-idle'); sendResponse({ locked }); }
+    else if (message?.type === MESSAGES.FOCUS_LOSS) { if (settings?.cloakOnFocusLoss) lock('focus-loss'); sendResponse({ locked }); }
+    else if (message?.type === MESSAGES.RESET) { recordActivity(); sendResponse({ reset: true }); }
+    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, enabled: settings?.enabled, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
+  });
 
   async function initialize() {
     settings = await window.BlurMyScreenSettings.get();
-    scheduleLock();
+    addMediaListeners();
+    new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => { if (node.nodeType === Node.ELEMENT_NODE) addMediaListeners(node); }))).observe(document.documentElement, { childList: true, subtree: true });
+    scheduleLock(true);
   }
 
-  IDLE_EVENTS.forEach((eventName) => window.addEventListener(eventName, recordActivity, { passive: true, capture: true }));
-  window.addEventListener('keydown', handleKeyDown);
-  window.addEventListener('keyup', handleKeyUp);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      scheduleLock();
-    } else if (settings.cloakOnFocusLoss) {
-      lock('focus-loss');
-    }
-  });
-
-  function applySettings(nextSettings) {
-    settings = nextSettings;
-    if (!settings.enabled) {
-      unlock();
-    } else if (locked) {
-      renderOverlay();
-    } else {
-      scheduleLock();
-    }
-  }
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local' && changes.blurMyScreenSettings) {
-      window.BlurMyScreenSettings.get().then(applySettings);
-    }
-  });
-
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === 'blur-my-screen:lock') {
-      lock('manual');
-      sendResponse({ locked: true });
-    } else if (message?.type === 'blur-my-screen:reset') {
-      recordActivity();
-      sendResponse({ reset: true });
-    } else if (message?.type === 'blur-my-screen:status') {
-      sendResponse({ 
-        locked, 
-        enabled: settings.enabled, 
-        remainingSeconds: getRemainingSeconds(),
-        isMediaPlaying: isMediaPlaying(),
-        maskedCount: window.BlurMyScreenPII?.scanPage() || 0
-      });
-    }
-  });
-
-
-  window.addEventListener('blur-my-screen:pii-updated', (e) => {
-    const count = e.detail.count;
-    const statusPill = host?.shadowRoot?.querySelector('#hud-status');
-    if (statusPill) {
-      statusPill.textContent = count > 0 
-        ? `🔒 ${count} PII Fields Masked` 
-        : 'Protecting your privacy';
-    }
-  });
-
+  IDLE_EVENTS.forEach((name) => window.addEventListener(name, recordActivity, { capture: true, passive: true }));
+  window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('keyup', onKeyUp, true);
+  window.addEventListener('blur', () => { if (locked) onKeyUp({ code: 'Space' }); });
+  window.addEventListener('beforeunload', disableMarquee);
+  document.addEventListener('visibilitychange', () => document.hidden && settings?.cloakOnFocusLoss && lock('focus-loss'));
+  chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.blurMyScreenSettings) window.BlurMyScreenSettings.get().then(applySettings); });
+  window.addEventListener('blur-my-screen:pii-updated', updateHudStatus);
   window.BlurMyScreen = { lock, unlock, applySettings };
   initialize();
 })();

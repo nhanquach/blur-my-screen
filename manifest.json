@@ -3,7 +3,10 @@
   "name": "Blur My Page",
   "version": "0.1.0",
   "description": "Blur idle webpages until you are ready to see them.",
-  "permissions": ["storage", "tabs"],
+  "permissions": ["storage", "tabs", "idle", "windows"],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
   "action": {
     "default_title": "Blur My Page",
     "default_popup": "src/popup/popup.html",
@@ -23,7 +26,7 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/shared/settings.js", "src/content/content.js"],
+      "js": ["src/shared/settings.js", "src/content/pii-scanner.js", "src/content/content.js"],
       "css": ["src/content/overlay.css"],
       "run_at": "document_start"
     }

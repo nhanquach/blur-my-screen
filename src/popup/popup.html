@@ -3,39 +3,84 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Blur My Page</title>
+    <title>BlurMyScreen</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main>
       <header>
-        <div class="logo" aria-hidden="true">◐</div>
-        <div><h1>Blur My Page</h1><p>Privacy, right when you need it.</p></div>
+        <div class="brand">
+          <div class="logo" aria-hidden="true">🌿</div>
+          <div>
+            <h1>BlurMyScreen</h1>
+            <p>Your botanical privacy sanctuary</p>
+          </div>
+        </div>
+        <label class="master-toggle" for="enabled">
+          <input id="enabled" type="checkbox" role="switch">
+          <span class="status-label">
+            <span class="pulse-dot"></span>
+            <span class="label-text">Paused</span>
+          </span>
+        </label>
       </header>
 
       <section class="panel">
-        <label class="toggle-row" for="enabled"><span><strong>Privacy screen</strong><small>Blur pages after inactivity</small></span><input id="enabled" type="checkbox" role="switch"></label>
-        <label for="idle-minutes">Idle timeout</label>
-        <select id="idle-minutes">
-          <option value="1">1 minute</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option>
-        </select>
+        <div class="panel-header">
+          <span class="label">Inactivity Timer</span>
+          <span id="countdown" class="countdown">--</span>
+        </div>
+        <div class="preset-pills" role="radiogroup" aria-label="Idle timeout presets">
+          <label><input type="radio" name="timeout" value="15"> <span>15s</span></label>
+          <label><input type="radio" name="timeout" value="30"> <span>30s</span></label>
+          <label><input type="radio" name="timeout" value="60"> <span>1m</span></label>
+          <label><input type="radio" name="timeout" value="180"> <span>3m</span></label>
+          <label><input type="radio" name="timeout" value="300"> <span>5m</span></label>
+        </div>
       </section>
 
       <section class="panel">
-        <span class="label">Reveal with</span>
-        <div class="segmented" role="radiogroup" aria-label="Unlock method">
-          <label><input type="radio" name="unlock-mode" value="click"> Click</label>
-          <label><input type="radio" name="unlock-mode" value="password"> Password</label>
+        <span class="label">Cloak Appearance</span>
+        <div class="segmented" role="radiogroup" aria-label="Appearance mode">
+          <label><input type="radio" name="mode" value="frosted"> <span>Frosted</span></label>
+          <label><input type="radio" name="mode" value="dimmed"> <span>Dimmed</span></label>
+          <label><input type="radio" name="mode" value="minimal"> <span>Minimal</span></label>
         </div>
-        <div id="password-row" hidden>
-          <label for="password">Set password</label>
-          <input id="password" type="password" autocomplete="new-password" placeholder="Enter a password">
-          <p class="hint">Leave empty to keep your current password.</p>
+        
+        <div class="slider-container">
+          <div class="slider-header">
+            <span class="label">Blur Intensity</span>
+            <span id="intensity-value" class="value">20px</span>
+          </div>
+          <input id="intensity" type="range" min="4" max="40" step="1">
+        </div>
+
+        <div class="preview-area">
+          <div id="preview-card" class="preview-card">
+            <span class="preview-text">Confidential</span>
+            <button id="preview-peek" class="peek-btn">[Peek]</button>
+          </div>
         </div>
       </section>
 
-      <button id="lock-now" class="lock-button" type="button">Blur this tab now</button>
-      <p id="status" class="status" role="status"></p>
+      <section class="panel">
+        <span class="label">Smart Triggers</span>
+        <div class="trigger-row">
+          <span>Pause when media playing</span>
+          <label class="switch"><input id="pause-media" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="trigger-row">
+          <span>Blur on focus loss</span>
+          <label class="switch"><input id="cloak-focus" type="checkbox"><span class="slider"></span></label>
+        </div>
+        <div class="trigger-row">
+          <span>Targeted PII masking</span>
+          <label class="switch"><input id="mask-pii" type="checkbox"><span class="slider"></span></label>
+        </div>
+      </section>
+
+      <button id="lock-now" class="primary-btn" type="button">Lock Screen Now</button>
+      <p id="status" class="status-msg" role="status"></p>
     </main>
     <script src="../shared/settings.js"></script>
     <script src="popup.js"></script>

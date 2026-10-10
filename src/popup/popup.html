@@ -13,17 +13,20 @@
           <div class="logo" aria-hidden="true">🌿</div>
           <div>
             <h1>BlurMyScreen</h1>
-            <p>Your botanical privacy sanctuary</p>
+
           </div>
         </div>
         <label class="master-toggle" for="enabled">
-          <input id="enabled" type="checkbox" role="switch">
-          <span class="status-label">
-            <span class="pulse-dot"></span>
-            <span class="label-text">Paused</span>
-          </span>
+          <span class="shield-label">Shield</span>
+          <input id="enabled" type="checkbox" role="switch" aria-label="Privacy shield">
+          <span class="shield-switch" aria-hidden="true"><span></span></span>
         </label>
       </header>
+
+      <section class="quick-row">
+        <label class="label" for="profile">Profile</label>
+        <select id="profile" aria-label="Default privacy profile"></select>
+      </section>
 
       <section class="panel">
         <div class="panel-header">
@@ -37,15 +40,18 @@
           <label><input type="radio" name="timeout" value="180"> <span>3m</span></label>
           <label><input type="radio" name="timeout" value="300"> <span>5m</span></label>
         </div>
-        <label class="custom-timeout" for="custom-timeout">
-          <span>Custom</span>
-          <input id="custom-timeout" type="number" min="5" max="3600" step="5" inputmode="numeric" placeholder="Seconds" aria-describedby="custom-timeout-help">
-          <span>sec</span>
+        <details class="custom-timeout">
+          <summary>Custom timeout</summary>
+          <label for="custom-timeout"><input id="custom-timeout" type="number" min="5" max="3600" step="5" inputmode="numeric" placeholder="Seconds" aria-describedby="custom-timeout-help"> sec</label>
           <span id="custom-timeout-help" class="sr-only">Set a custom inactivity timeout from 5 seconds to 1 hour.</span>
-        </label>
+        </details>
       </section>
 
-      <section class="panel">
+      <button id="lock-now" class="primary-btn" type="button">Lock now</button>
+
+      <details class="advanced-panel">
+        <summary><span class="label">Advanced settings</span><span>Appearance, automation & masking</span></summary>
+        <section class="panel">
         <span class="label">Cloak Appearance</span>
         <div class="segmented" role="radiogroup" aria-label="Appearance mode">
           <label><input type="radio" name="mode" value="frosted"> <span>Frosted</span></label>
@@ -80,10 +86,10 @@
             <button id="preview-peek" class="peek-btn">[Peek]</button>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class="panel">
-        <span class="label">Smart Triggers</span>
+        <section class="panel advanced-section">
+        <span class="label">Automation & masking</span>
         <div class="trigger-row">
           <span>Pause when media playing</span>
           <label class="switch"><input id="pause-media" type="checkbox" aria-label="Pause when media playing"><span class="slider"></span></label>
@@ -101,13 +107,23 @@
           <label class="switch"><input id="site-pii" type="checkbox" aria-label="Mask PII on this site"><span class="slider"></span></label>
         </div>
         <p id="site-pii-help" class="site-pii-help"></p>
+        <label class="trigger-row" for="pii-sensitivity">
+          <span>PII sensitivity</span>
+          <select id="pii-sensitivity"><option value="conservative">Conservative</option><option value="balanced">Balanced</option><option value="strict">Strict</option></select>
+        </label>
+        <div class="trigger-row">
+          <span>Presentation mode (this tab)</span>
+          <label class="switch"><input id="presentation" type="checkbox" aria-label="Presentation mode for this tab"><span class="slider"></span></label>
+        </div>
+        <p class="site-pii-help">Keeps PII masking on while full-page cloaks are manual-only.</p>
         <div class="trigger-row">
           <span>Hide HUD Capsule</span>
           <label class="switch"><input id="hide-hud" type="checkbox" aria-label="Hide HUD Capsule"><span class="slider"></span></label>
         </div>
-      </section>
+        </section>
+      </details>
 
-      <button id="lock-now" class="primary-btn" type="button">Lock Screen Now</button>
+      <button id="manage-rules" class="secondary-btn" type="button">Manage profiles & site rules</button>
       <p id="status" class="status-msg" role="status"></p>
     </main>
     <script src="../shared/messages.js"></script>

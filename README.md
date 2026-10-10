@@ -15,11 +15,11 @@ BlurMyScreen moves away from clinical security software towards a mindful, botan
   - **Frosted (Matcha Mist):** Organic diffusion using GPU-accelerated backdrop-filters.
   - **Dimmed:** Neutral low-luminance veil.
   - **Minimal:** Solid, opaque ceramic mask.
-- **Targeted PII Masking:** Heuristic detection of emails, credit card numbers, and currency metrics with a "Shift + Hover" peek affordance. The popup can exclude the current `http(s)` origin locally without sending page data anywhere.
+- **Targeted PII Masking:** Conservative, bounded on-device detection of emails, Luhn-valid card numbers, currency values, and explicitly labelled names. It scans visible content in idle-time batches, reports a local count by category, and offers a `Shift + Hover` peek affordance.
+- **Profiles and per-site rules:** Choose Everyday, Café, High privacy, or Presentation defaults, then add exact-origin local overrides from Settings. Presentation mode is tab-session scoped: PII masking stays active while full-page cloaks are manual-only.
 - **In-Page HUD:** A lightweight porcelain capsule for quick unblurring, tuning, and status monitoring. Hiding the capsule leaves a persistent, labeled Unblur button on every locked page.
 - **Power-User Hotkeys:**
-  - `Esc`: Instant manual lock.
-  - `Space` (Hold): Temporary peek reveal.
+    - `Space` (Hold): Temporary peek reveal.
   - `Cmd+M` / `Ctrl+M`: Selective marquee reveal area.
 
 ## 🛠 Installation (Developer Mode)
@@ -34,13 +34,14 @@ BlurMyScreen moves away from clinical security software towards a mindful, botan
 - **Zero-Trust Local Execution:** 100% on-device detection and cloaking.
 - **No Data Transfer:** Zero server data transfer; all preferences are stored in `chrome.storage.local`.
 - **No Analytics:** Zero external analytics or telemetry.
+- **Transparent local controls:** The popup reports mask count, scan-limit state, effective profile, and whether the mutation guard is active. It never exposes the masked values.
 - **Privacy Screen, Not Security:** This is a visual privacy shield to prevent casual shoulder-surfing. It does not encrypt or remove the underlying webpage content.
 
 ### Permissions and limitations
 
 - `storage` saves preferences locally; `tabs`, `idle`, and `windows` coordinate the active page with system-idle and focus-loss events. The extension does not read, retain, or transmit page text.
 - PII masking is a conservative visual heuristic for emails, Luhn-valid card-like numbers, common currency values, and explicitly labelled names. It can miss values or mask benign text, so it must not be relied on as a data-loss-prevention control.
-- The HUD and popup controls are keyboard accessible. `Esc` cloaks immediately, holding `Space` temporarily peeks, and `Cmd/Ctrl+M` enables a marquee reveal. The popup's `[Peek]` control supports press-and-hold with keyboard, mouse, and touch. Reduced-motion preferences disable overlay transitions.
+- The HUD and popup controls are keyboard accessible. Holding `Space` temporarily peeks, and `Cmd/Ctrl+M` enables a marquee reveal; `Esc` exits that temporary marquee mode without changing the page's normal Escape behavior. The popup's `[Peek]` control supports press-and-hold with keyboard, mouse, and touch. Reduced-motion preferences disable overlay transitions.
 - Browser-internal pages such as `chrome://`, extension galleries, and other restricted pages cannot be injected or protected; the popup identifies those pages as unsupported.
 
 ## 🧪 Development
@@ -50,4 +51,4 @@ npm run check
 npm test
 ```
 
-The check command validates syntax and the Manifest V3 configuration. The test command covers the pure inactivity-timer behavior used to preserve the remaining timeout around media playback.
+The check command validates syntax and the Manifest V3 configuration. The test command covers timer behavior, settings/profile resolution, and PII matching. See `docs/privacy-policy.md`, `docs/chrome-web-store-listing.md`, and `docs/release-checklist.md` for release material.

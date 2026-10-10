@@ -3,7 +3,6 @@
 
   const $ = (selector) => document.querySelector(selector);
   const enabled = $('#enabled');
-  const statusLabelText = $('.label-text');
   const countdown = $('#countdown');
   const customTimeout = $('#custom-timeout');
   const intensity = $('#intensity');
@@ -21,6 +20,9 @@
   const sitePiiLabel = $('#site-pii-label');
   const sitePiiHelp = $('#site-pii-help');
   const hideHud = $('#hide-hud');
+  const profile = $('#profile');
+  const piiSensitivity = $('#pii-sensitivity');
+  const presentation = $('#presentation');
   const status = $('#status');
 
   const MESSAGES = window.BlurMyScreenMessages;
@@ -49,7 +51,8 @@
         } else {
           countdown.textContent = response.isMediaPlaying ? 'Paused for media' : response.locked ? 'Cloaked' : '--';
         }
-        const details = [response.locked ? 'Cloaked' : 'Protecting', response.isMediaPlaying ? 'media playing' : null, response.count ? `${response.count} PII masked` : null].filter(Boolean);
+        const categorySummary = response.categories && Object.entries(response.categories).map(([type, count]) => `${count} ${type}`).join(', ');
+        const details = [response.locked ? 'Cloaked' : 'Protecting', response.profileName || null, response.isMediaPlaying ? 'media playing' : null, response.count ? `${response.count} PII masked${categorySummary ? ` (${categorySummary})` : ''}` : null, response.capped ? 'scan limit reached' : null].filter(Boolean);
         status.textContent = details.join(' · ');
       } catch {
         countdown.textContent = '--';
@@ -74,6 +77,13 @@
     const preset = document.querySelector(`input[name="timeout"][value="${timeoutSeconds}"]`);
     document.querySelectorAll('input[name="timeout"]').forEach((radio) => { radio.checked = radio === preset; });
     customTimeout.value = preset ? '' : String(timeoutSeconds);
+    const customSummary = document.querySelector('.custom-timeout summary');
+    if (customSummary) customSummary.textContent = preset ? 'Custom timeout' : `Custom: ${timeoutSeconds}s`;
+  }
+
+  async function notifyActiveTabSettingsChanged() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) await chrome.tabs.sendMessage(tab.id, { type: MESSAGES.SETTINGS_CHANGED }).catch(() => undefined);
   }
 
   function saveSettings() {
@@ -90,6 +100,7 @@
       cloakOnFocusLoss: cloakFocus.checked,
       targetedMaskingEnabled: maskPii.checked,
       hideHUD: hideHud.checked,
+      pii: { ...(currentSettings?.pii || {}), sensitivity: piiSensitivity.value },
     };
 
     saveQueue = saveQueue.catch(() => undefined).then(() => window.BlurMyScreenSettings.save(updates));
@@ -97,12 +108,15 @@
       currentSettings = savedSettings;
       updateMasterLabel();
       updateSitePiiControl();
+      // Do not wait for storage-change delivery: immediately update the page
+      // so a disabled shield removes an already-visible cloak.
+      notifyActiveTabSettingsChanged();
       return savedSettings;
     });
   }
 
   function updateMasterLabel() {
-    statusLabelText.textContent = enabled.checked ? 'Protecting' : 'Off';
+    enabled.setAttribute('aria-label', enabled.checked ? 'Privacy shield on' : 'Privacy shield off');
   }
 
   function updateSitePiiControl() {
@@ -115,7 +129,7 @@
     }
 
     const siteName = new URL(activeOrigin).host;
-    const isExcluded = currentSettings?.piiDisabledOrigins?.includes(activeOrigin);
+    const isExcluded = currentSettings?.siteRule?.overrides?.targetedMaskingEnabled === false;
     sitePii.disabled = false;
     sitePii.checked = !isExcluded;
     sitePiiLabel.textContent = `Mask PII on ${siteName}`;
@@ -202,12 +216,16 @@
   async function lockCurrentTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) return;
-    try {
-      await chrome.tabs.sendMessage(tab.id, { type: MESSAGES.LOCK });
-      showStatus('Tab locked successfully.');
-    } catch {
-      showStatus('This page cannot be locked.');
-    }
+    const result = await chrome.runtime.sendMessage({ type: MESSAGES.LOCK, tabId: tab.id }).catch(() => ({ ok: false }));
+    showStatus(result?.ok ? 'Tab locked successfully.' : 'This page cannot be locked.');
+  }
+
+  async function setPresentationMode() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+    const result = await chrome.runtime.sendMessage({ type: MESSAGES.SET_PRESENTATION, tabId: tab.id, enabled: presentation.checked }).catch(() => ({ ok: false }));
+    if (!result?.ok) { presentation.checked = !presentation.checked; showStatus('This page cannot use presentation mode.'); }
+    else { currentSettings = await window.BlurMyScreenSettings.get(activeOrigin, presentation.checked); showStatus(presentation.checked ? 'Presentation mode enabled for this tab.' : 'Presentation mode disabled.'); }
   }
 
   function showStatus(message) {
@@ -216,27 +234,29 @@
   }
 
   async function initialize() {
-    const [settings, tabs] = await Promise.all([
-      window.BlurMyScreenSettings.get(),
-      chrome.tabs.query({ active: true, currentWindow: true }),
-    ]);
-    currentSettings = settings;
+    const [tabs, envelope] = await Promise.all([chrome.tabs.query({ active: true, currentWindow: true }), window.BlurMyScreenSettings.getEnvelope()]);
     activeOrigin = window.BlurMyScreenSettings.normalizeOrigin(tabs[0]?.url);
+    const tabId = tabs[0]?.id;
+    const tabState = tabId ? await chrome.tabs.sendMessage(tabId, { type: MESSAGES.STATUS }).catch(() => null) : null;
+    presentation.checked = Boolean(tabState?.presentation);
+    currentSettings = window.BlurMyScreenSettings.resolve(envelope, activeOrigin, presentation.checked);
+    profile.replaceChildren(...envelope.profiles.map((item) => { const option = document.createElement('option'); option.value = item.id; option.textContent = item.name; option.selected = item.id === envelope.activeProfileId; return option; }));
 
-    enabled.checked = settings.enabled;
+    enabled.checked = currentSettings.enabled;
     updateMasterLabel();
 
-    syncTimeoutControls(settings.idleTimeoutSeconds);
+    syncTimeoutControls(currentSettings.idleTimeoutSeconds);
 
-    const modeRadio = document.querySelector(`input[name="mode"][value="${settings.cloakMode}"]`);
+    const modeRadio = document.querySelector(`input[name="mode"][value="${currentSettings.cloakMode}"]`);
     if (modeRadio) modeRadio.checked = true;
 
-    intensity.value = String(settings.blurIntensityPx);
-    brightness.value = String(settings.brightnessPercent);
-    pauseMedia.checked = settings.pauseWhenMediaPlaying;
-    cloakFocus.checked = settings.cloakOnFocusLoss;
-    maskPii.checked = settings.targetedMaskingEnabled;
-    hideHud.checked = settings.hideHUD;
+    intensity.value = String(currentSettings.blurIntensityPx);
+    brightness.value = String(currentSettings.brightnessPercent);
+    pauseMedia.checked = currentSettings.pauseWhenMediaPlaying;
+    cloakFocus.checked = currentSettings.cloakOnFocusLoss;
+    maskPii.checked = currentSettings.targetedMaskingEnabled;
+    hideHud.checked = currentSettings.hideHUD;
+    piiSensitivity.value = currentSettings.pii?.sensitivity || 'balanced';
     updateSitePiiControl();
 
     updatePreview();
@@ -261,6 +281,8 @@
     }
     customTimeout.setCustomValidity('');
     customTimeout.value = String(Math.round(value));
+    const customSummary = document.querySelector('.custom-timeout summary');
+    if (customSummary) customSummary.textContent = `Custom: ${customTimeout.value}s`;
     saveSettings();
   });
   document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => {
@@ -282,6 +304,10 @@
   maskPii.addEventListener('change', saveSettings);
   sitePii.addEventListener('change', saveSitePiiPreference);
   hideHud.addEventListener('change', saveSettings);
+  piiSensitivity.addEventListener('change', saveSettings);
+  presentation.addEventListener('change', setPresentationMode);
+  profile.addEventListener('change', async () => { await window.BlurMyScreenSettings.setActiveProfile(profile.value); currentSettings = await window.BlurMyScreenSettings.get(activeOrigin, presentation.checked); showStatus('Default profile updated.'); });
+  $('#manage-rules').addEventListener('click', () => chrome.runtime.openOptionsPage());
   $('#lock-now').addEventListener('click', lockCurrentTab);
 
   // Preview Peek interaction: hold to reveal with keyboard, mouse, and touch.

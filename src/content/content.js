@@ -8,6 +8,8 @@
   let settings;
   let inactivityTimer;
   let locked = false;
+  let lockKind = null; // "manual" survives navigation; automatic locks are document-lifetime only.
+  let presentationMode = false;
   let host;
   const inactivity = window.BlurMyScreenInactivityTimer.create();
   let marquee;
@@ -89,7 +91,7 @@
     const status = host?.shadowRoot?.querySelector('#hud-status');
     if (!status) return;
     const pii = window.BlurMyScreenPII?.getStatus();
-    status.textContent = pii?.count ? `Protected · ${pii.count} PII fields masked` : 'Protected locally';
+    status.textContent = pii?.count ? `Protected · ${pii.count} PII fields masked${pii.capped ? ' (scan limit reached)' : ''}` : 'Protected locally';
   }
 
   function disableMarquee() {
@@ -137,7 +139,7 @@
     host.id = OVERLAY_ID;
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.innerHTML = `<style>
-      .screen{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;padding:20px;box-sizing:border-box;color:#263c32;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;opacity:0;transition:opacity 360ms cubic-bezier(.22,.61,.36,1);will-change:opacity}.screen.is-visible{opacity:1}.screen.is-peeking{opacity:0;transition-duration:180ms}.screen:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,#3d5a49 1px,transparent 1px);background-size:40px 40px;opacity:.05}.hud{position:relative;display:flex;align-items:center;width:min(372px,100%);height:46px;padding:0 7px;border:1px solid #e4e9e5;border-radius:15px;background:#fff;box-shadow:0 12px 30px rgba(31,53,42,.16),0 2px 6px rgba(31,53,42,.06);opacity:0;transform:translateY(10px) scale(.985);transition:opacity 260ms ease-out 70ms,transform 360ms cubic-bezier(.22,.61,.36,1) 70ms;will-change:transform,opacity}.screen.is-visible .hud{opacity:1;transform:translateY(0) scale(1)}.screen.is-peeking .hud{transition-delay:0ms}.identity{display:flex;align-items:center;gap:7px;min-width:0;padding:0 7px 0 1px}.shield{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:#e7f4eb;color:#477663}.shield svg,.action svg,.unblur svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.brand{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;letter-spacing:-.01em}.state{display:block;width:5px;height:5px;margin-left:1px;border-radius:50%;background:#4b8069;box-shadow:0 0 0 2px #e6f4ec}.status{display:none}.unblur{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;margin-left:auto;padding:0 9px;border:0;border-radius:8px;background:#3d6654;color:#fff;font:700 12px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.16)}.unlock-fallback{position:relative;margin-left:0;padding:0 16px;box-shadow:0 8px 20px rgba(31,53,42,.2)}.unblur svg{color:#fff;stroke:#fff!important;flex:0 0 16px}.unblur:hover{background:#315644}.key{padding:2px 4px;border-radius:3px;background:rgba(255,255,255,.17);font:600 9px/1 ui-monospace,SFMono-Regular,monospace;color:#fff}.separator{width:1px;height:22px;margin:0 2px 0 7px;background:#e7ece8}.action{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#486052;cursor:pointer}.action:hover,.action:focus-visible{background:#edf3ef;outline:none}.action:focus-visible,.unblur:focus-visible{outline:2px solid #264d3c;outline-offset:2px}@media(max-width:430px){.screen{padding:12px}.hud{width:100%;height:44px}.identity{padding-right:3px}.brand{font-size:0}.state{margin-left:0}.unblur{gap:5px;padding:0 8px}.key{display:none}.separator{margin:0 1px 0 5px}.action{width:28px;height:28px}}@media(prefers-reduced-motion:reduce){.screen,.hud{transition:none!important}.screen{will-change:auto}.hud{will-change:auto}}</style>
+      .screen{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;padding:20px;box-sizing:border-box;color:#263c32;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;opacity:0;transition:opacity 360ms cubic-bezier(.22,.61,.36,1);will-change:opacity}.screen.is-visible{opacity:1}.screen.is-peeking{opacity:0;transition-duration:180ms}.screen:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,#3d5a49 1px,transparent 1px);background-size:40px 40px;opacity:.05}.hud{position:relative;display:flex;align-items:center;width:min(372px,100%);height:46px;padding:0 7px;border:1px solid #e4e9e5;border-radius:15px;background:#fff;box-shadow:0 12px 30px rgba(31,53,42,.16),0 2px 6px rgba(31,53,42,.06);opacity:0;transform:translateY(10px) scale(.985);transition:opacity 260ms ease-out 70ms,transform 360ms cubic-bezier(.22,.61,.36,1) 70ms;will-change:transform,opacity}.screen.is-visible .hud{opacity:1;transform:translateY(0) scale(1)}.screen.is-peeking .hud{transition-delay:0ms}.identity{display:flex;align-items:center;gap:7px;min-width:0;padding:0 7px 0 1px}.shield{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:#e7f4eb;color:#477663}.shield svg,.action svg,.unblur svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.brand{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;letter-spacing:-.01em}.state{display:block;width:5px;height:5px;margin-left:1px;border-radius:50%;background:#4b8069;box-shadow:0 0 0 2px #e6f4ec}.status{display:none}.unblur{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;margin-left:auto;padding:0 9px;border:0;border-radius:8px;background:#3d6654;color:#fff;font:700 12px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.16)}.unlock-fallback{position:relative;margin-left:0;padding:0 16px;box-shadow:0 8px 20px rgba(31,53,42,.2)}.hud[hidden],.unlock-fallback[hidden]{display:none!important}.unblur svg{color:#fff;stroke:#fff!important;flex:0 0 16px}.unblur:hover{background:#315644}.key{padding:2px 4px;border-radius:3px;background:rgba(255,255,255,.17);font:600 9px/1 ui-monospace,SFMono-Regular,monospace;color:#fff}.separator{width:1px;height:22px;margin:0 2px 0 7px;background:#e7ece8}.action{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#486052;cursor:pointer}.action:hover,.action:focus-visible{background:#edf3ef;outline:none}.action:focus-visible,.unblur:focus-visible{outline:2px solid #264d3c;outline-offset:2px}@media(max-width:430px){.screen{padding:12px}.hud{width:100%;height:44px}.identity{padding-right:3px}.brand{font-size:0}.state{margin-left:0}.unblur{gap:5px;padding:0 8px}.key{display:none}.separator{margin:0 1px 0 5px}.action{width:28px;height:28px}}@media(prefers-reduced-motion:reduce){.screen,.hud{transition:none!important}.screen{will-change:auto}.hud{will-change:auto}}</style>
       <section class="screen" role="dialog" aria-modal="true" aria-labelledby="hud-title" tabindex="-1"><div class="hud"><div class="identity"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5.5 6v5.2c0 4.4 2.7 7.5 6.5 9.3 3.8-1.8 6.5-4.9 6.5-9.3V6L12 3Z"/></svg></span><span class="brand" id="hud-title">BlurMyScreen</span><span class="state" aria-label="Protection active"></span></div><p class="status" id="hud-status"></p><button class="unblur" id="unblur" type="button" aria-label="Unblur screen; hold Space for a temporary peek"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.25"/></svg><span>Unblur</span><kbd class="key">Space</kbd></button><span class="separator" aria-hidden="true"></span><button class="action" id="tune" type="button" aria-label="Cycle cloak appearance"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></button><button class="action" id="lock" type="button" aria-label="Lock screen"><svg viewBox="0 0 24 24"><rect x="5.5" y="10" width="13" height="10" rx="2"/><path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10"/></svg></button></div><button class="unblur unlock-fallback" id="unblur-fallback" type="button" aria-label="Unblur screen">Unblur screen</button></section>`;
     const screen = shadow.querySelector('.screen');
     applyVeilStyle(screen);
@@ -152,8 +154,10 @@
     document.documentElement.append(host);
     const hud = shadow.querySelector('.hud');
     const fallbackUnlock = shadow.querySelector('#unblur-fallback');
-    hud.hidden = settings.hideHUD;
-    fallbackUnlock.hidden = !settings.hideHUD;
+    // Keep exactly one affordance in the DOM. Relying on `hidden` here is
+    // fragile because page/author display rules can override it in a shadow UI.
+    if (settings.hideHUD) hud.remove();
+    else fallbackUnlock.remove();
     updateHudStatus();
     requestAnimationFrame(() => {
       screen.classList.add('is-visible');
@@ -162,27 +166,38 @@
   }
 
   function lock(reason) {
-    const manual = reason.startsWith('manual');
+    const manual = ['manual', 'restored-manual', 'popup'].includes(reason);
     if (!settings) { if (manual) pendingManualLock = true; return; }
     if (!settings.enabled && !manual) return;
+    // Playback is an active-use signal. Never let any automatic trigger
+    // (including browser idle and focus events) cloak a playing tab.
+    if (!manual && settings.pauseWhenMediaPlaying && mediaPlaying()) {
+      scheduleLock(false);
+      return;
+    }
     if (locked) {
       disableMarquee();
-      // A manual lock request should still provide clear feedback, even when a
-      // focus-loss cloak is already covering the tab.
+      // Esc/HUD/manual lock upgrades an automatic cloak into a persistent one.
+      if (manual && lockKind !== 'manual') {
+        lockKind = 'manual';
+        chrome.runtime.sendMessage({ type: MESSAGES.LOCK_STATE, manualLocked: true }).catch(() => undefined);
+      }
       if (manual) renderOverlay();
       return;
     }
     locked = true;
+    lockKind = manual ? 'manual' : 'automatic';
     clearTimer();
     inactivity.clear();
-    chrome.runtime.sendMessage({ type: MESSAGES.LOCK_STATE, locked: true }).catch(() => undefined);
+    if (manual) chrome.runtime.sendMessage({ type: MESSAGES.LOCK_STATE, manualLocked: true }).catch(() => undefined);
     renderOverlay();
   }
 
   function unlock() {
     locked = false;
+    lockKind = null;
     pendingManualLock = false;
-    chrome.runtime.sendMessage({ type: MESSAGES.LOCK_STATE, locked: false }).catch(() => undefined);
+    chrome.runtime.sendMessage({ type: MESSAGES.LOCK_STATE, manualLocked: false }).catch(() => undefined);
     disableMarquee();
     const currentHost = host;
     const screen = currentHost?.shadowRoot?.querySelector('.screen');
@@ -205,7 +220,11 @@
   function onKeyDown(event) {
     const shortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'm';
     const peek = event.code === 'Space' && locked;
-    if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); disableMarquee(); lock('manual-esc'); return; }
+    // Preserve Escape for the page. It only exits our temporary marquee mode.
+    if (event.key === 'Escape') {
+      if (marqueeMode) { event.preventDefault(); event.stopImmediatePropagation(); disableMarquee(); }
+      return;
+    }
     if (shortcut) { event.preventDefault(); event.stopImmediatePropagation(); marqueeMode ? disableMarquee() : enableMarquee(); return; }
     if (peek && !event.repeat) {
       event.preventDefault(); event.stopImmediatePropagation();
@@ -236,6 +255,8 @@
     settings = next;
     window.BlurMyScreenPII?.applySettings(settings);
     addMediaListeners();
+    // The master protection switch is an explicit opt-out: clear every cloak,
+    // including a persisted manual lock, so the visible page matches the popup.
     if (!settings.enabled && locked) unlock();
     else if (locked) renderOverlay();
     else scheduleLock(true);
@@ -245,7 +266,7 @@
     if (message?.type === MESSAGES.LOCK) {
       if (!settings) pendingManualLock = true;
       else lock('manual');
-      sendResponse({ locked: locked || pendingManualLock });
+      sendResponse({ locked: locked || pendingManualLock, kind: 'manual' });
     }
     else if (message?.type === MESSAGES.AUTO_LOCK) {
       // A system-idle signal is an independent privacy trigger; it should not
@@ -255,18 +276,28 @@
     }
     else if (message?.type === MESSAGES.FOCUS_LOSS) { if (settings?.cloakOnFocusLoss) lock('focus-loss'); sendResponse({ locked }); }
     else if (message?.type === MESSAGES.RESET) { recordActivity(); sendResponse({ reset: true }); }
-    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, enabled: settings?.enabled, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
+    else if (message?.type === MESSAGES.SET_PRESENTATION) {
+      presentationMode = Boolean(message.enabled);
+      window.BlurMyScreenSettings.get(location.origin, presentationMode).then(applySettings);
+      sendResponse({ presentation: presentationMode });
+    }
+    else if (message?.type === MESSAGES.SETTINGS_CHANGED) {
+      window.BlurMyScreenSettings.get(location.origin, presentationMode).then((next) => { applySettings(next); sendResponse({ applied: true }); });
+      return true;
+    }
+    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, lockKind, enabled: settings?.enabled, profileName: settings?.profileName, presentation: presentationMode, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
   });
 
   async function initialize() {
-    const [loadedSettings, savedState] = await Promise.all([
-      window.BlurMyScreenSettings.get(),
-      chrome.runtime.sendMessage({ type: MESSAGES.GET_LOCK_STATE }).catch(() => ({ locked: false })),
-    ]);
-    settings = loadedSettings;
+    const savedState = await chrome.runtime.sendMessage({ type: MESSAGES.GET_LOCK_STATE }).catch(() => ({ manualLocked: false, presentation: false }));
+    presentationMode = savedState?.presentation === true;
+    settings = await window.BlurMyScreenSettings.get(location.origin, presentationMode);
     addMediaListeners();
+    // `play`/`pause` do not bubble, so capture them at the document level as
+    // well as observing known media. This covers dynamically mounted players.
+    ['play', 'pause', 'ended'].forEach((name) => document.addEventListener(name, onMediaChange, true));
     new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => { if (node.nodeType === Node.ELEMENT_NODE) addMediaListeners(node); }))).observe(document.documentElement, { childList: true, subtree: true });
-    if (savedState?.locked || pendingManualLock) lock(savedState?.locked ? 'restored-manual' : 'manual');
+    if (savedState?.manualLocked || pendingManualLock) lock(savedState?.manualLocked ? 'restored-manual' : 'manual');
     else scheduleLock(true);
   }
 
@@ -282,7 +313,7 @@
   window.addEventListener('blur', () => { if (locked) onKeyUp({ code: 'Space' }); });
   window.addEventListener('beforeunload', disableMarquee);
   document.addEventListener('visibilitychange', () => document.hidden && settings?.cloakOnFocusLoss && lock('focus-loss'));
-  chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.blurMyScreenSettings) window.BlurMyScreenSettings.get().then(applySettings); });
+  chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.blurMyScreenSettings) window.BlurMyScreenSettings.get(location.origin, presentationMode).then(applySettings); });
   window.addEventListener('blur-my-screen:pii-updated', updateHudStatus);
   window.BlurMyScreen = { lock, unlock, applySettings };
   initialize();

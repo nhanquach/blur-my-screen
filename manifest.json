@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Blur My Page",
-  "version": "0.1.0",
-  "description": "Blur idle webpages until you are ready to see them.",
+  "name": "BlurMyScreen",
+  "version": "0.2.0",
+  "description": "Local-only visual privacy protection for webpages.",
   "permissions": ["storage", "tabs", "idle", "windows"],
   "background": {
     "service_worker": "src/background/service-worker.js"
   },
   "action": {
-    "default_title": "Blur My Page",
+    "default_title": "BlurMyScreen",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "public/icons/icon-16.png",
@@ -23,10 +23,14 @@
     "48": "public/icons/icon-48.png",
     "128": "public/icons/icon-128.png"
   },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/shared/messages.js", "src/shared/settings.js", "src/shared/inactivity-timer.js", "src/content/pii-scanner.js", "src/content/content.js"],
+      "js": ["src/shared/messages.js", "src/shared/settings.js", "src/shared/inactivity-timer.js", "src/shared/pii-matcher.js", "src/content/pii-scanner.js", "src/content/content.js"],
       "css": ["src/content/overlay.css"],
       "run_at": "document_start"
     }

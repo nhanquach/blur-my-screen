@@ -1,0 +1,6 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs'); const path = require('node:path'); const test = require('node:test'); const vm = require('node:vm');
+function matcher() { const context = { window: {} }; vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../src/shared/pii-matcher.js'), 'utf8'), context); return context.window.BlurMyScreenPiiMatcher; }
+test('matches high-confidence PII and rejects invalid cards', () => { const result = matcher().matchesFor('Email jane@example.com; card 4111 1111 1111 1111; invalid 4111 1111 1111 1112; $1,250.00', { categories: {} }); assert.deepEqual(Array.from(result, (item) => item.category), ['email', 'paymentCard', 'currency']); });
+test('names require explicit high-confidence labels', () => { const api = matcher(); assert.equal(api.matchesFor('Name: Jane Doe', { categories: {}, sensitivity: 'balanced' }).some((item) => item.category === 'labeledName'), false); assert.equal(api.matchesFor('Patient: Jane Doe', { categories: {}, sensitivity: 'balanced' }).some((item) => item.category === 'labeledName'), true); });
+test('conservative mode leaves labeled names alone', () => { assert.equal(matcher().matchesFor('Client: Jane Doe', { categories: {}, sensitivity: 'conservative' }).length, 0); });

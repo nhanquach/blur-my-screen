@@ -1,1 +1,49 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BlurMyScreen settings</title><link rel="stylesheet" href="options.css"></head><body><main><h1>BlurMyScreen settings</h1><p>All preferences and site rules remain in this browser.</p><section><h2>Default profile</h2><select id="profile"></select><p id="profile-description"></p></section><section><h2>Per-site rule</h2><form id="rule-form"><label>Website origin <input id="origin" type="url" placeholder="https://example.com" required></label><label><input id="mask-pii" type="checkbox" checked> Mask PII on this site</label><label><input id="always-protect" type="checkbox"> Use High privacy profile</label><button>Save rule</button></form><p id="status" role="status"></p><ul id="rules"></ul></section></main><script src="../shared/settings.js"></script><script src="options.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>BlurMyScreen settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <h1>BlurMyScreen settings</h1>
+      <p>All preferences and site rules remain in this browser.</p>
+
+      <section>
+        <h2>Excluded websites</h2>
+        <p class="muted">BlurMyScreen will not blur or mask PII on these exact website origins.</p>
+        <form id="exclude-form" class="site-form">
+          <label for="excluded-origin">Website address</label>
+          <div class="form-row">
+            <input id="excluded-origin" type="url" placeholder="https://example.com" required>
+            <button type="submit">Exclude site</button>
+          </div>
+        </form>
+        <p id="exclude-status" role="status"></p>
+        <ul id="excluded-sites" class="site-list"></ul>
+      </section>
+
+      <section>
+        <h2>Default profile</h2>
+        <select id="profile"></select>
+        <p id="profile-description" class="muted"></p>
+      </section>
+
+      <section>
+        <h2>Per-site rule</h2>
+        <form id="rule-form">
+          <label>Website origin <input id="origin" type="url" placeholder="https://example.com" required></label>
+          <label><input id="mask-pii" type="checkbox" checked> Mask PII on this site</label>
+          <label><input id="always-protect" type="checkbox"> Use High privacy profile</label>
+          <button>Save rule</button>
+        </form>
+        <p id="status" role="status"></p>
+        <ul id="rules" class="site-list"></ul>
+      </section>
+    </main>
+    <script src="../shared/settings.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -16,7 +16,7 @@ BlurMyScreen moves away from clinical security software towards a mindful, botan
   - **Dimmed:** Neutral low-luminance veil.
   - **Minimal:** Solid, opaque ceramic mask.
 - **Targeted PII Masking:** Conservative, bounded on-device detection of emails, Luhn-valid card numbers, currency values, and explicitly labelled names. It scans visible content in idle-time batches, reports a local count by category, and offers a `Shift + Hover` peek affordance.
-- **Profiles and per-site rules:** Choose Everyday, Café, High privacy, or Presentation defaults, then add exact-origin local overrides from Settings. Presentation mode is tab-session scoped: PII masking stays active while full-page cloaks are manual-only.
+- **Profiles and per-site rules:** Choose Everyday, Café, High privacy, or Presentation defaults, then add exact-origin local overrides from Settings. Exclude the current site in one click from the popup, or manage excluded sites in Settings; excluded sites receive no cloaking or PII masking. Presentation mode is tab-session scoped: PII masking stays active while full-page cloaks are manual-only.
 - **In-Page HUD:** A lightweight porcelain capsule for quick unblurring, tuning, and status monitoring. Hiding the capsule leaves a persistent, labeled Unblur button on every locked page.
 - **Power-User Hotkeys:**
     - `Space` (Hold): Temporary peek reveal.

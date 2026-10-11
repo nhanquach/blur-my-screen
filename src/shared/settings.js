@@ -4,7 +4,7 @@
   const root = typeof window === 'undefined' ? self : window;
   const STORAGE_KEY = 'blurMyScreenSettings';
   const OLD_STORAGE_KEY = 'blurMyPageSettings';
-  const SCHEMA_VERSION = 2;
+  const SCHEMA_VERSION = 3;
   let writeQueue = Promise.resolve();
 
   const DEFAULT_SETTINGS = Object.freeze({
@@ -76,16 +76,21 @@
     for (const origin of Array.isArray(value.piiDisabledOrigins) ? value.piiDisabledOrigins.map(normalizeOrigin).filter(Boolean) : []) {
       if (!rules.some((rule) => rule.origin === origin)) rules.push({ id: `origin:${origin}`, origin, overrides: { targetedMaskingEnabled: false } });
     }
+    const excludedOrigins = (Array.isArray(value.excludedOrigins) ? value.excludedOrigins : [])
+      .map(normalizeOrigin).filter(Boolean).filter((origin, index, all) => all.indexOf(origin) === index).slice(0, 200);
     const activeProfileId = uniqueProfiles.some((profile) => profile.id === value.activeProfileId) ? value.activeProfileId : 'everyday';
-    return { schemaVersion: SCHEMA_VERSION, activeProfileId, profiles: uniqueProfiles, siteRules: rules };
+    return { schemaVersion: SCHEMA_VERSION, activeProfileId, profiles: uniqueProfiles, siteRules: rules, excludedOrigins };
   }
   function mergeConfig(base, overrides) { return normalizeConfig({ ...base, ...overrides, pii: { ...(base.pii || {}), ...(overrides?.pii || {}), categories: { ...(base.pii?.categories || {}), ...(overrides?.pii?.categories || {}) } } }); }
   function resolve(envelope, origin, presentation = false) {
     const normalized = normalizeEnvelope(envelope);
-    const rule = normalizeOrigin(origin) ? normalized.siteRules.find((item) => item.origin === normalizeOrigin(origin)) : null;
+    const normalizedOrigin = normalizeOrigin(origin);
+    const rule = normalizedOrigin ? normalized.siteRules.find((item) => item.origin === normalizedOrigin) : null;
+    const excluded = Boolean(normalizedOrigin && normalized.excludedOrigins.includes(normalizedOrigin));
     const profileId = presentation ? 'presentation' : rule?.profileId || normalized.activeProfileId;
     const profile = normalized.profiles.find((item) => item.id === profileId) || normalized.profiles[0];
-    return { ...mergeConfig(profile.config, rule?.overrides), profileId: profile.id, profileName: profile.name, siteRule: rule || null, presentation: Boolean(presentation) };
+    const config = mergeConfig(profile.config, rule?.overrides);
+    return { ...config, ...(excluded ? { enabled: false, targetedMaskingEnabled: false } : {}), profileId: profile.id, profileName: profile.name, siteRule: rule || null, excluded, presentation: Boolean(presentation) };
   }
   async function migrate() {
     const stored = await chrome.storage.local.get([STORAGE_KEY, OLD_STORAGE_KEY]);
@@ -131,7 +136,17 @@
     });
     return resolve(envelope, normalizedOrigin);
   }
+  async function setSiteExcluded(origin, excluded) {
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) throw new TypeError('Excluded sites require an http(s) origin.');
+    const envelope = await enqueue((next) => {
+      const origins = new Set(next.excludedOrigins);
+      if (excluded) origins.add(normalizedOrigin); else origins.delete(normalizedOrigin);
+      next.excludedOrigins = [...origins];
+    });
+    return resolve(envelope, normalizedOrigin);
+  }
   function isPiiMaskingEnabledForOrigin(settings, origin) { return Boolean(resolve({ profiles: [{ id: 'everyday', name: 'Everyday', config: settings }], activeProfileId: 'everyday' }, origin).targetedMaskingEnabled && normalizeOrigin(origin)); }
 
-  root.BlurMyScreenSettings = { STORAGE_KEY, SCHEMA_VERSION, DEFAULT_SETTINGS, BUILTIN_PROFILES, normalizeOrigin, normalizeConfig, normalizeEnvelope, resolve, getEnvelope, get, save, setActiveProfile, setPiiMaskingForOrigin, isPiiMaskingEnabledForOrigin };
+  root.BlurMyScreenSettings = { STORAGE_KEY, SCHEMA_VERSION, DEFAULT_SETTINGS, BUILTIN_PROFILES, normalizeOrigin, normalizeConfig, normalizeEnvelope, resolve, getEnvelope, get, save, setActiveProfile, setPiiMaskingForOrigin, setSiteExcluded, isPiiMaskingEnabledForOrigin };
 })();

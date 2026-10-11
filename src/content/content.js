@@ -168,6 +168,7 @@
   function lock(reason) {
     const manual = ['manual', 'restored-manual', 'popup'].includes(reason);
     if (!settings) { if (manual) pendingManualLock = true; return; }
+    if (settings.excluded) { pendingManualLock = false; return; }
     if (!settings.enabled && !manual) return;
     // Playback is an active-use signal. Never let any automatic trigger
     // (including browser idle and focus events) cloak a playing tab.
@@ -257,7 +258,8 @@
     addMediaListeners();
     // The master protection switch is an explicit opt-out: clear every cloak,
     // including a persisted manual lock, so the visible page matches the popup.
-    if (!settings.enabled && locked) unlock();
+    if ((!settings.enabled || settings.excluded) && locked) unlock();
+    if (settings.excluded) pendingManualLock = false;
     else if (locked) renderOverlay();
     else scheduleLock(true);
   }
@@ -285,7 +287,7 @@
       window.BlurMyScreenSettings.get(location.origin, presentationMode).then((next) => { applySettings(next); sendResponse({ applied: true }); });
       return true;
     }
-    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, lockKind, enabled: settings?.enabled, profileName: settings?.profileName, presentation: presentationMode, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
+    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, lockKind, enabled: settings?.enabled, excluded: settings?.excluded === true, profileName: settings?.profileName, presentation: presentationMode, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
   });
 
   async function initialize() {

@@ -28,10 +28,13 @@
         <select id="profile" aria-label="Default privacy profile"></select>
       </section>
 
-      <section class="panel">
-        <div class="panel-header">
-          <span class="label">Inactivity Timer</span>
-          <span id="countdown" class="countdown">--</span>
+      <section class="panel timer-panel" aria-labelledby="timer-title">
+        <div class="panel-header timer-header">
+          <div>
+            <span id="timer-title" class="label">Inactivity timer</span>
+            <span class="timer-caption">Cloak the page when you step away</span>
+          </div>
+          <span id="countdown" class="countdown" aria-label="Time remaining">--</span>
         </div>
         <div class="preset-pills" role="radiogroup" aria-label="Idle timeout presets">
           <label><input type="radio" name="timeout" value="15"> <span>15s</span></label>
@@ -48,6 +51,13 @@
       </section>
 
       <button id="lock-now" class="primary-btn" type="button">Lock now</button>
+      <section class="site-exclusion" aria-labelledby="site-exclusion-label">
+        <div>
+          <span id="site-exclusion-label" class="label">Exclude this website</span>
+          <p id="site-exclusion-help">Turn off BlurMyScreen for the current site.</p>
+        </div>
+        <button id="toggle-site-exclusion" class="text-btn" type="button">Exclude site</button>
+      </section>
 
       <details class="advanced-panel">
         <summary><span class="label">Advanced settings</span><span>Appearance, automation & masking</span></summary>

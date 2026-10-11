@@ -23,6 +23,8 @@
   const profile = $('#profile');
   const piiSensitivity = $('#pii-sensitivity');
   const presentation = $('#presentation');
+  const toggleSiteExclusion = $('#toggle-site-exclusion');
+  const siteExclusionHelp = $('#site-exclusion-help');
   const status = $('#status');
 
   const MESSAGES = window.BlurMyScreenMessages;
@@ -52,7 +54,7 @@
           countdown.textContent = response.isMediaPlaying ? 'Paused for media' : response.locked ? 'Cloaked' : '--';
         }
         const categorySummary = response.categories && Object.entries(response.categories).map(([type, count]) => `${count} ${type}`).join(', ');
-        const details = [response.locked ? 'Cloaked' : 'Protecting', response.profileName || null, response.isMediaPlaying ? 'media playing' : null, response.count ? `${response.count} PII masked${categorySummary ? ` (${categorySummary})` : ''}` : null, response.capped ? 'scan limit reached' : null].filter(Boolean);
+        const details = [response.excluded ? 'Excluded on this site' : response.locked ? 'Cloaked' : 'Protecting', response.excluded ? null : response.profileName || null, response.isMediaPlaying ? 'media playing' : null, response.count ? `${response.count} PII masked${categorySummary ? ` (${categorySummary})` : ''}` : null, response.capped ? 'scan limit reached' : null].filter(Boolean);
         status.textContent = details.join(' · ');
       } catch {
         countdown.textContent = '--';
@@ -119,6 +121,36 @@
     enabled.setAttribute('aria-label', enabled.checked ? 'Privacy shield on' : 'Privacy shield off');
   }
 
+  function updateSiteExclusionControl() {
+    const siteName = activeOrigin ? new URL(activeOrigin).host : null;
+    const isExcluded = currentSettings?.excluded === true;
+    toggleSiteExclusion.disabled = !activeOrigin;
+    $('#lock-now').disabled = !activeOrigin || isExcluded;
+    toggleSiteExclusion.textContent = isExcluded ? 'Include site' : 'Exclude site';
+    siteExclusionHelp.textContent = !siteName
+      ? 'This page does not have a supported web origin.'
+      : isExcluded
+        ? `BlurMyScreen is off on ${siteName}.`
+        : `Turn off BlurMyScreen for ${siteName}.`;
+  }
+
+  async function toggleCurrentSiteExclusion() {
+    if (!activeOrigin) return;
+    const shouldExclude = !currentSettings?.excluded;
+    toggleSiteExclusion.disabled = true;
+    try {
+      currentSettings = await window.BlurMyScreenSettings.setSiteExcluded(activeOrigin, shouldExclude);
+      await notifyActiveTabSettingsChanged();
+      updateSiteExclusionControl();
+      updateSitePiiControl();
+      showStatus(shouldExclude ? 'Site excluded.' : 'Site included again.');
+    } catch {
+      showStatus('Could not update this site.');
+    } finally {
+      updateSiteExclusionControl();
+    }
+  }
+
   function updateSitePiiControl() {
     if (!activeOrigin) {
       sitePii.disabled = true;
@@ -129,6 +161,13 @@
     }
 
     const siteName = new URL(activeOrigin).host;
+    if (currentSettings?.excluded) {
+      sitePii.disabled = true;
+      sitePii.checked = false;
+      sitePiiLabel.textContent = `Mask PII on ${siteName}`;
+      sitePiiHelp.textContent = 'This website is excluded from BlurMyScreen.';
+      return;
+    }
     const isExcluded = currentSettings?.siteRule?.overrides?.targetedMaskingEnabled === false;
     sitePii.disabled = false;
     sitePii.checked = !isExcluded;
@@ -258,6 +297,7 @@
     hideHud.checked = currentSettings.hideHUD;
     piiSensitivity.value = currentSettings.pii?.sensitivity || 'balanced';
     updateSitePiiControl();
+    updateSiteExclusionControl();
 
     updatePreview();
     updateCountdown();
@@ -309,6 +349,7 @@
   profile.addEventListener('change', async () => { await window.BlurMyScreenSettings.setActiveProfile(profile.value); currentSettings = await window.BlurMyScreenSettings.get(activeOrigin, presentation.checked); showStatus('Default profile updated.'); });
   $('#manage-rules').addEventListener('click', () => chrome.runtime.openOptionsPage());
   $('#lock-now').addEventListener('click', lockCurrentTab);
+  toggleSiteExclusion.addEventListener('click', toggleCurrentSiteExclusion);
 
   // Preview Peek interaction: hold to reveal with keyboard, mouse, and touch.
   function revealPreview() {

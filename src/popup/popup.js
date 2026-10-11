@@ -274,9 +274,10 @@
 
   async function initialize() {
     const [tabs, envelope] = await Promise.all([chrome.tabs.query({ active: true, currentWindow: true }), window.BlurMyScreenSettings.getEnvelope()]);
-    activeOrigin = window.BlurMyScreenSettings.normalizeOrigin(tabs[0]?.url);
     const tabId = tabs[0]?.id;
     const tabState = tabId ? await chrome.tabs.sendMessage(tabId, { type: MESSAGES.STATUS }).catch(() => null) : null;
+    // The content script reports its own origin, so the popup never needs the `tabs` permission to read tab URLs.
+    activeOrigin = window.BlurMyScreenSettings.normalizeOrigin(tabState?.origin);
     presentation.checked = Boolean(tabState?.presentation);
     currentSettings = window.BlurMyScreenSettings.resolve(envelope, activeOrigin, presentation.checked);
     profile.replaceChildren(...envelope.profiles.map((item) => { const option = document.createElement('option'); option.value = item.id; option.textContent = item.name; option.selected = item.id === envelope.activeProfileId; return option; }));

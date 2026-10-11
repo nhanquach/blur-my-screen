@@ -53,7 +53,7 @@ Full-page reveal controls leave targeted text masks in place. The popup's **[Pee
 
 - **Local processing:** Page text is inspected on-device for masking. Detected values are not saved or transmitted; there are no analytics, telemetry, or external services.
 - **Local storage:** Preferences, profiles, site rules, and excluded origins use `chrome.storage.local`. Manual-lock and presentation state use `chrome.storage.session` for the current browser session.
-- **Permissions:** `storage` saves configuration and session state; `tabs` identifies pages and routes commands; `idle` detects system inactivity; `windows` tracks browser focus. Content scripts run on HTTP and HTTPS webpages to apply cloaks and inspect text for masking.
+- **Permissions:** `storage` saves configuration and session state; `idle` detects system inactivity; `windows` tracks browser focus. The extension does not request the `tabs` permission; content scripts report their own page origin to the popup. Content scripts run on HTTP and HTTPS webpages to apply cloaks and inspect text for masking.
 - **Visual privacy only:** The extension does not encrypt, remove, or secure underlying content. Blur and dimming may leave information discernible, and the webpage can still access its original data. This is not a data-loss-prevention control or protection against malicious pages.
 - **Heuristic coverage:** Masking can miss sensitive information or hide benign text. It scans rendered text nodes, not images, canvas content, form fields, or editable content. Content inside iframes and shadow roots is not covered by the current scanner. Scans are asynchronous and limited, so masking is not guaranteed before content becomes visible.
 - **Supported pages:** Browser-internal pages, extension galleries, local files, and other restricted pages cannot be protected. The popup reports pages without a responding content script as unsupported.
@@ -69,6 +69,14 @@ npm test
 ```
 
 `npm run check` validates JavaScript syntax and the Manifest V3 configuration. `npm test` covers inactivity-timer behavior, settings/profile resolution, and PII matching. These are automated checks, not browser integration tests. `npm run build` is an alias for the checks; it does not generate a bundle.
+
+### Packaging for the Chrome Web Store
+
+```sh
+npm run package
+```
+
+Runs the checks and tests, then writes `dist/blur-my-screen-<version>.zip` containing only `manifest.json`, `src/`, and `public/`. Upload that zip in the Chrome Web Store Developer Dashboard.
 
 ### Project structure
 

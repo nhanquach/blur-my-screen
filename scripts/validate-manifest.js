@@ -6,7 +6,12 @@ if (manifest.manifest_version !== 3) throw new Error('Manifest V3 is required.')
 if (manifest.name !== 'BlurMyScreen' || manifest.action.default_title !== 'BlurMyScreen') throw new Error('Manifest branding must be BlurMyScreen.');
 if (manifest.background.service_worker !== 'src/background/service-worker.js') throw new Error('Expected the BlurMyScreen service worker.');
 if (manifest.options_ui?.page !== 'src/options/options.html') throw new Error('Expected the local options page.');
-for (const permission of ['storage', 'tabs', 'idle', 'windows']) if (!manifest.permissions?.includes(permission)) throw new Error(`Missing required permission: ${permission}`);
+const expectedPermissions = ['storage', 'idle', 'windows'];
+for (const permission of expectedPermissions) if (!manifest.permissions?.includes(permission)) throw new Error(`Missing required permission: ${permission}`);
+for (const permission of manifest.permissions || []) if (!expectedPermissions.includes(permission)) throw new Error(`Unexpected permission: ${permission}. Keep permissions minimal for Chrome Web Store review.`);
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+if (pkg.version !== manifest.version) throw new Error(`Version mismatch: package.json ${pkg.version} vs manifest.json ${manifest.version}`);
+if (!fs.existsSync('public/icons/icon-128.png')) throw new Error('Missing 128px store icon.');
 if (manifest.host_permissions?.length) throw new Error('Content-script matches must be the only site access declaration.');
 const scripts = manifest.content_scripts?.[0];
 const expectedScripts = ['src/shared/messages.js', 'src/shared/settings.js', 'src/shared/inactivity-timer.js', 'src/shared/pii-matcher.js', 'src/content/pii-scanner.js', 'src/content/content.js'];

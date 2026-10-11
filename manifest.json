@@ -3,7 +3,7 @@
   "name": "BlurMyScreen",
   "version": "0.2.0",
   "description": "Local-only visual privacy protection for webpages.",
-  "permissions": ["storage", "tabs", "idle", "windows"],
+  "permissions": ["storage", "idle", "windows"],
   "background": {
     "service_worker": "src/background/service-worker.js"
   },

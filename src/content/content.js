@@ -287,7 +287,7 @@
       window.BlurMyScreenSettings.get(location.origin, presentationMode).then((next) => { applySettings(next); sendResponse({ applied: true }); });
       return true;
     }
-    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, lockKind, enabled: settings?.enabled, excluded: settings?.excluded === true, profileName: settings?.profileName, presentation: presentationMode, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
+    else if (message?.type === MESSAGES.STATUS) sendResponse({ origin: location.origin, locked, lockKind, enabled: settings?.enabled, excluded: settings?.excluded === true, profileName: settings?.profileName, presentation: presentationMode, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
   });
 
   async function initialize() {

@@ -8,4 +8,4 @@ Preferences, profiles, and exact-origin site rules are stored with `chrome.stora
 
 PII detection is an on-device visual heuristic. It may miss values or mask benign text; it is not a DLP, encryption, or compliance control.
 
-Contact: replace this line with the publisher support address before store submission.
+Contact: qtrongnhan@gmail.com

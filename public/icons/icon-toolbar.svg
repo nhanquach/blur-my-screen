@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <title>BlurMyScreen toolbar icon</title>
+  <desc>An edge-to-edge webpage with a bold privacy band and no outer padding.</desc>
+  <defs>
+    <clipPath id="page"><rect width="16" height="16" rx="3"/></clipPath>
+  </defs>
+  <g clip-path="url(#page)">
+    <rect width="16" height="16" fill="#2d493b"/>
+    <rect x="1.5" y="5" width="13" height="9.5" rx="1" fill="#fbf9f6"/>
+    <g fill="#fbf9f6">
+      <circle cx="3" cy="2.5" r=".75"/>
+      <circle cx="5.5" cy="2.5" r=".75"/>
+      <circle cx="8" cy="2.5" r=".75"/>
+    </g>
+    <path d="M4 7.5H10" stroke="#829b80" stroke-width="1" stroke-linecap="round"/>
+    <rect x="5" y="9" width="11" height="4" rx="1" fill="#2d493b"/>
+    <rect x="7" y="10.5" width="1" height="1" fill="#fbf9f6"/>
+    <rect x="9" y="10.5" width="1" height="1" fill="#c1d0bc"/>
+    <rect x="11" y="10.5" width="1" height="1" fill="#829b80"/>
+  </g>
+</svg>

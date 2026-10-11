@@ -43,13 +43,10 @@ header {
 
 .logo {
   flex: 0 0 40px;
+  width: 40px;
   height: 40px;
-  display: grid;
-  place-items: center;
-  background-color: var(--container-low);
-  border: 1px solid var(--border-sage);
+  display: block;
   border-radius: var(--radius-lg);
-  font-size: 20px;
 }
 
 header h1 {

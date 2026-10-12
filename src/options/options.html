@@ -26,6 +26,20 @@
       </section>
 
       <section>
+        <h2>Always-locked websites</h2>
+        <p class="muted">These exact website origins open already cloaked every time they load, until you unblur them.</p>
+        <form id="lock-on-load-form" class="site-form">
+          <label for="lock-on-load-origin">Website address</label>
+          <div class="form-row">
+            <input id="lock-on-load-origin" type="url" placeholder="https://example.com" required>
+            <button type="submit">Always lock site</button>
+          </div>
+        </form>
+        <p id="lock-on-load-status" role="status"></p>
+        <ul id="lock-on-load-sites" class="site-list"></ul>
+      </section>
+
+      <section>
         <h2>Default profile</h2>
         <select id="profile"></select>
         <p id="profile-description" class="muted"></p>

@@ -78,8 +78,11 @@
     }
     const excludedOrigins = (Array.isArray(value.excludedOrigins) ? value.excludedOrigins : [])
       .map(normalizeOrigin).filter(Boolean).filter((origin, index, all) => all.indexOf(origin) === index).slice(0, 200);
+    // Sites the user chose to open already cloaked. Exclusion wins if an origin is somehow in both lists.
+    const lockOnLoadOrigins = (Array.isArray(value.lockOnLoadOrigins) ? value.lockOnLoadOrigins : [])
+      .map(normalizeOrigin).filter(Boolean).filter((origin, index, all) => all.indexOf(origin) === index && !excludedOrigins.includes(origin)).slice(0, 200);
     const activeProfileId = uniqueProfiles.some((profile) => profile.id === value.activeProfileId) ? value.activeProfileId : 'everyday';
-    return { schemaVersion: SCHEMA_VERSION, activeProfileId, profiles: uniqueProfiles, siteRules: rules, excludedOrigins };
+    return { schemaVersion: SCHEMA_VERSION, activeProfileId, profiles: uniqueProfiles, siteRules: rules, excludedOrigins, lockOnLoadOrigins };
   }
   function mergeConfig(base, overrides) { return normalizeConfig({ ...base, ...overrides, pii: { ...(base.pii || {}), ...(overrides?.pii || {}), categories: { ...(base.pii?.categories || {}), ...(overrides?.pii?.categories || {}) } } }); }
   function resolve(envelope, origin, presentation = false) {
@@ -87,10 +90,11 @@
     const normalizedOrigin = normalizeOrigin(origin);
     const rule = normalizedOrigin ? normalized.siteRules.find((item) => item.origin === normalizedOrigin) : null;
     const excluded = Boolean(normalizedOrigin && normalized.excludedOrigins.includes(normalizedOrigin));
+    const lockOnLoad = Boolean(normalizedOrigin && !excluded && normalized.lockOnLoadOrigins.includes(normalizedOrigin));
     const profileId = presentation ? 'presentation' : rule?.profileId || normalized.activeProfileId;
     const profile = normalized.profiles.find((item) => item.id === profileId) || normalized.profiles[0];
     const config = mergeConfig(profile.config, rule?.overrides);
-    return { ...config, ...(excluded ? { enabled: false, targetedMaskingEnabled: false } : {}), profileId: profile.id, profileName: profile.name, siteRule: rule || null, excluded, presentation: Boolean(presentation) };
+    return { ...config, ...(excluded ? { enabled: false, targetedMaskingEnabled: false } : {}), profileId: profile.id, profileName: profile.name, siteRule: rule || null, excluded, lockOnLoad, presentation: Boolean(presentation) };
   }
   async function migrate() {
     const stored = await chrome.storage.local.get([STORAGE_KEY, OLD_STORAGE_KEY]);
@@ -143,10 +147,23 @@
       const origins = new Set(next.excludedOrigins);
       if (excluded) origins.add(normalizedOrigin); else origins.delete(normalizedOrigin);
       next.excludedOrigins = [...origins];
+      if (excluded) next.lockOnLoadOrigins = next.lockOnLoadOrigins.filter((origin) => origin !== normalizedOrigin);
+    });
+    return resolve(envelope, normalizedOrigin);
+  }
+  async function setSiteLockOnLoad(origin, lockOnLoad) {
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) throw new TypeError('Always-lock sites require an http(s) origin.');
+    const envelope = await enqueue((next) => {
+      const origins = new Set(next.lockOnLoadOrigins);
+      if (lockOnLoad) origins.add(normalizedOrigin); else origins.delete(normalizedOrigin);
+      next.lockOnLoadOrigins = [...origins];
+      // Choosing to always lock a site implies the user wants it protected, so lift any exclusion.
+      if (lockOnLoad) next.excludedOrigins = next.excludedOrigins.filter((item) => item !== normalizedOrigin);
     });
     return resolve(envelope, normalizedOrigin);
   }
   function isPiiMaskingEnabledForOrigin(settings, origin) { return Boolean(resolve({ profiles: [{ id: 'everyday', name: 'Everyday', config: settings }], activeProfileId: 'everyday' }, origin).targetedMaskingEnabled && normalizeOrigin(origin)); }
 
-  root.BlurMyScreenSettings = { STORAGE_KEY, SCHEMA_VERSION, DEFAULT_SETTINGS, BUILTIN_PROFILES, normalizeOrigin, normalizeConfig, normalizeEnvelope, resolve, getEnvelope, get, save, setActiveProfile, setPiiMaskingForOrigin, setSiteExcluded, isPiiMaskingEnabledForOrigin };
+  root.BlurMyScreenSettings = { STORAGE_KEY, SCHEMA_VERSION, DEFAULT_SETTINGS, BUILTIN_PROFILES, normalizeOrigin, normalizeConfig, normalizeEnvelope, resolve, getEnvelope, get, save, setActiveProfile, setPiiMaskingForOrigin, setSiteExcluded, setSiteLockOnLoad, isPiiMaskingEnabledForOrigin };
 })();

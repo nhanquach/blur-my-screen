@@ -133,7 +133,7 @@
     });
   }
 
-  function renderOverlay() {
+  function renderOverlay({ instant = false } = {}) {
     host?.remove();
     host = document.createElement('div');
     host.id = OVERLAY_ID;
@@ -142,6 +142,8 @@
       .screen{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:flex-end;justify-content:center;padding:20px;box-sizing:border-box;color:#263c32;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;opacity:0;transition:opacity 360ms cubic-bezier(.22,.61,.36,1);will-change:opacity}.screen.is-visible{opacity:1}.screen.is-peeking{opacity:0;transition-duration:180ms}.screen:before{content:'';position:absolute;inset:0;background-image:radial-gradient(circle,#3d5a49 1px,transparent 1px);background-size:40px 40px;opacity:.05}.hud{position:relative;display:flex;align-items:center;width:min(372px,100%);height:46px;padding:0 7px;border:1px solid #e4e9e5;border-radius:15px;background:#fff;box-shadow:0 12px 30px rgba(31,53,42,.16),0 2px 6px rgba(31,53,42,.06);opacity:0;transform:translateY(10px) scale(.985);transition:opacity 260ms ease-out 70ms,transform 360ms cubic-bezier(.22,.61,.36,1) 70ms;will-change:transform,opacity}.screen.is-visible .hud{opacity:1;transform:translateY(0) scale(1)}.screen.is-peeking .hud{transition-delay:0ms}.identity{display:flex;align-items:center;gap:7px;min-width:0;padding:0 7px 0 1px}.shield{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:9px;background:#e7f4eb;color:#477663}.shield svg,.action svg,.unblur svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.brand{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750;letter-spacing:-.01em}.state{display:block;width:5px;height:5px;margin-left:1px;border-radius:50%;background:#4b8069;box-shadow:0 0 0 2px #e6f4ec}.status{display:none}.unblur{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;margin-left:auto;padding:0 9px;border:0;border-radius:8px;background:#3d6654;color:#fff;font:700 12px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.16)}.unlock-fallback{position:relative;margin-left:0;padding:0 16px;box-shadow:0 8px 20px rgba(31,53,42,.2)}.hud[hidden],.unlock-fallback[hidden]{display:none!important}.unblur svg{color:#fff;stroke:#fff!important;flex:0 0 16px}.unblur:hover{background:#315644}.key{padding:2px 4px;border-radius:3px;background:rgba(255,255,255,.17);font:600 9px/1 ui-monospace,SFMono-Regular,monospace;color:#fff}.separator{width:1px;height:22px;margin:0 2px 0 7px;background:#e7ece8}.action{display:grid;place-items:center;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:transparent;color:#486052;cursor:pointer}.action:hover,.action:focus-visible{background:#edf3ef;outline:none}.action:focus-visible,.unblur:focus-visible{outline:2px solid #264d3c;outline-offset:2px}@media(max-width:430px){.screen{padding:12px}.hud{width:100%;height:44px}.identity{padding-right:3px}.brand{font-size:0}.state{margin-left:0}.unblur{gap:5px;padding:0 8px}.key{display:none}.separator{margin:0 1px 0 5px}.action{width:28px;height:28px}}@media(prefers-reduced-motion:reduce){.screen,.hud{transition:none!important}.screen{will-change:auto}.hud{will-change:auto}}</style>
       <section class="screen" role="dialog" aria-modal="true" aria-labelledby="hud-title" tabindex="-1"><div class="hud"><div class="identity"><span class="shield" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5.5 6v5.2c0 4.4 2.7 7.5 6.5 9.3 3.8-1.8 6.5-4.9 6.5-9.3V6L12 3Z"/></svg></span><span class="brand" id="hud-title">BlurMyScreen</span><span class="state" aria-label="Protection active"></span></div><p class="status" id="hud-status"></p><button class="unblur" id="unblur" type="button" aria-label="Unblur screen; hold Space for a temporary peek"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-5 9.5-5 9.5 5 9.5 5-3.5 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.25"/></svg><span>Unblur</span><kbd class="key">Space</kbd></button><span class="separator" aria-hidden="true"></span><button class="action" id="tune" type="button" aria-label="Cycle cloak appearance"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></svg></button><button class="action" id="lock" type="button" aria-label="Lock screen"><svg viewBox="0 0 24 24"><rect x="5.5" y="10" width="13" height="10" rx="2"/><path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10"/></svg></button></div><button class="unblur unlock-fallback" id="unblur-fallback" type="button" aria-label="Unblur screen">Unblur screen</button></section>`;
     const screen = shadow.querySelector('.screen');
+    // On page load, skip the fade-in so the page never flashes before the cloak.
+    if (instant) { screen.style.transition = 'none'; screen.classList.add('is-visible'); requestAnimationFrame(() => { screen.style.transition = ''; }); }
     applyVeilStyle(screen);
     shadow.querySelector('#unblur').addEventListener('click', unlock);
     shadow.querySelector('#unblur-fallback').addEventListener('click', unlock);
@@ -167,12 +169,15 @@
 
   function lock(reason) {
     const manual = ['manual', 'restored-manual', 'popup'].includes(reason);
+    // An always-lock site is an explicit user choice: it cloaks on load even with
+    // Shield off or media playing, but stays document-lifetime like automatic locks.
+    const explicit = manual || reason === 'on-load';
     if (!settings) { if (manual) pendingManualLock = true; return; }
     if (settings.excluded) { pendingManualLock = false; return; }
-    if (!settings.enabled && !manual) return;
+    if (!settings.enabled && !explicit) return;
     // Playback is an active-use signal. Never let any automatic trigger
     // (including browser idle and focus events) cloak a playing tab.
-    if (!manual && settings.pauseWhenMediaPlaying && mediaPlaying()) {
+    if (!explicit && settings.pauseWhenMediaPlaying && mediaPlaying()) {
       scheduleLock(false);
       return;
     }
@@ -191,7 +196,7 @@
     clearTimer();
     inactivity.clear();
     if (manual) chrome.runtime.sendMessage({ type: MESSAGES.LOCK_STATE, manualLocked: true }).catch(() => undefined);
-    renderOverlay();
+    renderOverlay({ instant: reason === 'on-load' || reason === 'restored-manual' });
   }
 
   function unlock() {
@@ -287,7 +292,7 @@
       window.BlurMyScreenSettings.get(location.origin, presentationMode).then((next) => { applySettings(next); sendResponse({ applied: true }); });
       return true;
     }
-    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, lockKind, enabled: settings?.enabled, excluded: settings?.excluded === true, profileName: settings?.profileName, presentation: presentationMode, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
+    else if (message?.type === MESSAGES.STATUS) sendResponse({ locked, lockKind, enabled: settings?.enabled, excluded: settings?.excluded === true, lockOnLoad: settings?.lockOnLoad === true, profileName: settings?.profileName, presentation: presentationMode, remainingSeconds: remainingSeconds(), isMediaPlaying: mediaPlaying(), appearance: { cloakMode: settings?.cloakMode, blurIntensityPx: settings?.blurIntensityPx, brightnessPercent: settings?.brightnessPercent }, ...window.BlurMyScreenPII?.getStatus() });
   });
 
   async function initialize() {
@@ -300,6 +305,7 @@
     ['play', 'pause', 'ended'].forEach((name) => document.addEventListener(name, onMediaChange, true));
     new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => { if (node.nodeType === Node.ELEMENT_NODE) addMediaListeners(node); }))).observe(document.documentElement, { childList: true, subtree: true });
     if (savedState?.manualLocked || pendingManualLock) lock(savedState?.manualLocked ? 'restored-manual' : 'manual');
+    else if (settings.lockOnLoad) lock('on-load');
     else scheduleLock(true);
   }
 

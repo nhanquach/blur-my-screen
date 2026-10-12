@@ -25,6 +25,8 @@
   const presentation = $('#presentation');
   const toggleSiteExclusion = $('#toggle-site-exclusion');
   const siteExclusionHelp = $('#site-exclusion-help');
+  const siteLockOnLoad = $('#site-lock-on-load');
+  const siteLockOnLoadHelp = $('#site-lock-on-load-help');
   const status = $('#status');
 
   const MESSAGES = window.BlurMyScreenMessages;
@@ -134,6 +136,36 @@
         : `Turn off BlurMyScreen for ${siteName}.`;
   }
 
+  function updateSiteLockOnLoadControl() {
+    const siteName = activeOrigin ? new URL(activeOrigin).host : null;
+    const isExcluded = currentSettings?.excluded === true;
+    siteLockOnLoad.disabled = !activeOrigin || isExcluded;
+    siteLockOnLoad.checked = currentSettings?.lockOnLoad === true;
+    siteLockOnLoadHelp.textContent = !siteName
+      ? 'This page does not have a supported web origin.'
+      : isExcluded
+        ? `Include ${siteName} first to always lock it.`
+        : siteLockOnLoad.checked
+          ? `${siteName} opens cloaked every time it loads.`
+          : `Open ${siteName} already cloaked until you unblur it.`;
+  }
+
+  async function saveSiteLockOnLoad() {
+    if (!activeOrigin) return;
+    const shouldLock = siteLockOnLoad.checked;
+    siteLockOnLoad.disabled = true;
+    try {
+      currentSettings = await window.BlurMyScreenSettings.setSiteLockOnLoad(activeOrigin, shouldLock);
+      await notifyActiveTabSettingsChanged();
+      showStatus(shouldLock ? 'This site will open locked.' : 'Always-lock turned off.');
+    } catch {
+      siteLockOnLoad.checked = !shouldLock;
+      showStatus('Could not update this site.');
+    } finally {
+      updateSiteLockOnLoadControl();
+    }
+  }
+
   async function toggleCurrentSiteExclusion() {
     if (!activeOrigin) return;
     const shouldExclude = !currentSettings?.excluded;
@@ -142,6 +174,7 @@
       currentSettings = await window.BlurMyScreenSettings.setSiteExcluded(activeOrigin, shouldExclude);
       await notifyActiveTabSettingsChanged();
       updateSiteExclusionControl();
+      updateSiteLockOnLoadControl();
       updateSitePiiControl();
       showStatus(shouldExclude ? 'Site excluded.' : 'Site included again.');
     } catch {
@@ -298,6 +331,7 @@
     piiSensitivity.value = currentSettings.pii?.sensitivity || 'balanced';
     updateSitePiiControl();
     updateSiteExclusionControl();
+    updateSiteLockOnLoadControl();
 
     updatePreview();
     updateCountdown();
@@ -350,6 +384,7 @@
   $('#manage-rules').addEventListener('click', () => chrome.runtime.openOptionsPage());
   $('#lock-now').addEventListener('click', lockCurrentTab);
   toggleSiteExclusion.addEventListener('click', toggleCurrentSiteExclusion);
+  siteLockOnLoad.addEventListener('change', saveSiteLockOnLoad);
 
   // Preview Peek interaction: hold to reveal with keyboard, mouse, and touch.
   function revealPreview() {

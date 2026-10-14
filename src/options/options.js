@@ -36,6 +36,19 @@
       return item;
     }));
 
+    const lockOnLoadSites = $('#lock-on-load-sites');
+    lockOnLoadSites.replaceChildren(...envelope.lockOnLoadOrigins.map((origin) => {
+      const item = document.createElement('li');
+      const text = document.createElement('span');
+      text.textContent = origin;
+      item.append(text, removeButton('Stop locking', async () => {
+        await window.BlurMyScreenSettings.setSiteLockOnLoad(origin, false);
+        $('#lock-on-load-status').textContent = `${new URL(origin).host} no longer opens locked.`;
+        render();
+      }));
+      return item;
+    }));
+
     const rules = $('#rules');
     rules.replaceChildren(...envelope.siteRules.map((rule) => {
       const item = document.createElement('li');
@@ -65,6 +78,19 @@
     }
     await window.BlurMyScreenSettings.setSiteExcluded(origin, true);
     $('#exclude-status').textContent = `${new URL(origin).host} is excluded.`;
+    event.target.reset();
+    render();
+  });
+
+  $('#lock-on-load-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const origin = window.BlurMyScreenSettings.normalizeOrigin($('#lock-on-load-origin').value);
+    if (!origin) {
+      $('#lock-on-load-status').textContent = 'Enter a full http(s) website address.';
+      return;
+    }
+    await window.BlurMyScreenSettings.setSiteLockOnLoad(origin, true);
+    $('#lock-on-load-status').textContent = `${new URL(origin).host} will open locked.`;
     event.target.reset();
     render();
   });
